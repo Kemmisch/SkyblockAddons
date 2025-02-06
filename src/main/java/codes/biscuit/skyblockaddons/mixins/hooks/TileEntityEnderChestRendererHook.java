@@ -1,7 +1,7 @@
 package codes.biscuit.skyblockaddons.mixins.hooks;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.utils.ColorCode;
 import codes.biscuit.skyblockaddons.utils.ColorUtils;
 import codes.biscuit.skyblockaddons.utils.LocationUtils;
@@ -18,8 +18,8 @@ public class TileEntityEnderChestRendererHook {
         SkyblockAddons main = SkyblockAddons.getInstance();
 
         if (main.getUtils().isOnSkyblock() && Minecraft.getMinecraft().currentScreen == null
-                && main.getConfigValues().isEnabled(Feature.MAKE_ENDERCHESTS_GREEN_IN_END)
-                && LocationUtils.isZealotSpawnLocation(main.getUtils().getLocation())) {
+                && Feature.MAKE_ENDERCHESTS_GREEN_IN_END.isEnabled()
+                && LocationUtils.isOnZealotSpawnLocation()) {
             tileEntityEnderChestRenderer.bindTexture(BLANK_ENDERCHEST);
         } else {
             tileEntityEnderChestRenderer.bindTexture(enderChestTexture);
@@ -29,9 +29,9 @@ public class TileEntityEnderChestRendererHook {
     public static void setEnderchestColor() {
         SkyblockAddons main = SkyblockAddons.getInstance();
         if (main.getUtils().isOnSkyblock() && Minecraft.getMinecraft().currentScreen == null
-                && main.getConfigValues().isEnabled(Feature.MAKE_ENDERCHESTS_GREEN_IN_END)
-                && LocationUtils.isZealotSpawnLocation(main.getUtils().getLocation())) {
-            int color = main.getConfigValues().getColor(Feature.MAKE_ENDERCHESTS_GREEN_IN_END);
+                && Feature.MAKE_ENDERCHESTS_GREEN_IN_END.isEnabled()
+                && LocationUtils.isOnZealotSpawnLocation()) {
+            int color = Feature.MAKE_ENDERCHESTS_GREEN_IN_END.getColor();
             if (color == ColorCode.GREEN.getColor()) {
                 GlStateManager.color(0, 1, 0); // classic lime green
             } else {

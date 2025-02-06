@@ -1,7 +1,7 @@
 package codes.biscuit.skyblockaddons.features.healingcircle;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.utils.ColorUtils;
 import codes.biscuit.skyblockaddons.utils.DrawUtils;
 import codes.biscuit.skyblockaddons.utils.MathUtils;
@@ -14,10 +14,12 @@ import java.awt.geom.Point2D;
 import java.util.Iterator;
 import java.util.Set;
 
+import static codes.biscuit.skyblockaddons.core.feature.FeatureSetting.HEALING_CIRCLE_OPACITY;
+
 public class HealingCircleManager {
 
-    private static SkyblockAddons main = SkyblockAddons.getInstance();
-    @Getter private static Set<HealingCircle> healingCircles = Sets.newConcurrentHashSet();
+    private static final SkyblockAddons main = SkyblockAddons.getInstance();
+    @Getter private static final Set<HealingCircle> healingCircles = Sets.newConcurrentHashSet();
 
     public static void addHealingCircleParticle(HealingCircleParticle healingCircleParticle) {
         HealingCircle nearbyHealingCircle = null;
@@ -43,8 +45,9 @@ public class HealingCircleManager {
         }
     }
 
-    public static void renderHealingCircleOverlays(float partialTicks) {
-        if (main.getUtils().isOnSkyblock() && main.getConfigValues().isEnabled(Feature.SHOW_HEALING_CIRCLE_WALL)) {
+    public static void renderHealingCircleOverlays() {
+        Feature feature = Feature.SHOW_HEALING_CIRCLE_WALL;
+        if (main.getUtils().isOnSkyblock() && feature.isEnabled()) {
 
             Iterator<HealingCircle> healingCircleIterator = healingCircles.iterator();
             while (healingCircleIterator.hasNext()) {
@@ -71,8 +74,14 @@ public class HealingCircleManager {
                     GlStateManager.enableAlpha();
                     GlStateManager.disableTexture2D();
 
-                    boolean chroma = main.getConfigValues().getChromaFeatures().contains(Feature.SHOW_HEALING_CIRCLE_WALL);
-                    int color = main.getConfigValues().getColor(Feature.SHOW_HEALING_CIRCLE_WALL, ColorUtils.getAlphaIntFromFloat(MathUtils.clamp(main.getConfigValues().getHealingCircleOpacity().floatValue(), 0, 1)));
+                    boolean chroma = feature.isChroma();
+                    int color = feature.getColor(
+                            ColorUtils.getAlphaIntFromFloat(
+                                    MathUtils.clamp(
+                                            feature.getAsNumber(HEALING_CIRCLE_OPACITY).floatValue(), 0, 1
+                                    )
+                            )
+                    );
                     DrawUtils.drawCylinder(circleCenter.getX(), 0, circleCenter.getY(), HealingCircle.RADIUS, 255, ColorUtils.getDummySkyblockColor(color, chroma));
 
                     GlStateManager.enableCull();

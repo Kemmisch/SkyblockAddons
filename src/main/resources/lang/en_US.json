@@ -3,6 +3,7 @@
   "language": "English",
   "settings": {
     "settings": "Settings",
+    "none": "None",
     "magmaBossWarning": "Magma Boss Warning",
     "balBossWarning": "Bal Boss Warning",
     "broodMotherWarning": "Broodmother Warning",
@@ -88,6 +89,8 @@
     "tabEffectTimers": "Potion and Powerup Timers",
     "noArrowsLeftAlert": "No Arrows Left Alert",
     "showCakeBagPreview": "Show Preview for Cake Bags",
+    "showPersonalCompactorPreview": "Show Personal Compactor Preview",
+    "showBuildersToolPreview": "Show Preview for Builder's Tools",
     "showBackpackPreviewInAH": "Show Backpack Preview for Your Items While AH is Open",
     "enableDevFeatures": "Enable Developer Features",
     "chromaSpeed": "Chroma Speed",
@@ -155,7 +158,6 @@
     "dragonStatsTracker": "Dragon Tracker",
     "skillActionsLeftUntilNextLevel": "Show Actions Left Until Next Level",
     "dungeonDeathCounter": "Dungeon Death Counter",
-    "showPersonalCompactorPreview": "Show Personal Compactor Preview",
     "rockPetTracker": "Rock Pet Tracker",
     "dolphinPetTracker": "Dolphin Pet Tracker",
     "dungeonsTeammateNameOverlay": "Dungeons Teammate Name Overlay",
@@ -211,6 +213,7 @@
     "guiScaleY": "GUI Y Scale: %scale%",
     "abbreviateSkillXpDenominator": "Abbreviate Skill XP Denominator",
     "abbreviateDrillFuelDenominator": "Abbreviate Drill Fuel Denominator",
+    "abbreviateThunderDisplaysDenominator": "Abbreviate Thunder Display's Denominator",
     "otherDefenseStats": "Other Defense Stats (Soul Tether/Cell Alignment)",
     "hideSpawnPointPlayers": "Hide Players at Hub Spawn Point",
     "jacobsContestTimer": "Jacob's Contest Timer",
@@ -245,11 +248,23 @@
     "petDisplay": "Pet Display",
     "petItemStyle": "Pet Item Style",
     "petItemStyles": {
-      "none": "None",
       "displayName": "Display Name",
       "showItem": "Show Item"
     },
-    "stopNameOverlayWhenClose": "Stop rendering when vanilla name tag good enough to see"
+    "healthTextIcon": "Health Number Icon",
+    "manaTextIcon": "Mana Number Icon",
+    "defenceTextIcon": "Defence Number Icon",
+    "effectiveHealthTextIcon": "Effective Health Number Icon",
+    "xAllignment": "X Allignment",
+    "classColoredTeammate": "Class Colored Outline",
+    "drawLockOnlyWhenHovered": "Draw Lock Icon only when hovered with mouse",
+    "showFarmingToolsPreview": "Show Preview for Farming Tools",
+    "renderItemOnLog": "Render Item on Item Pickup Log",
+    "healerColor": "Healer",
+    "mageColor": "Mage",
+    "berserkColor": "Berserk",
+    "archerColor": "Archer",
+    "tankColor": "Tank"
   },
   "messages": {
     "enchants": "Enchants",
@@ -293,8 +308,8 @@
     "blockIncompletePatterns": "Block crafting incomplete patterns (recommended)",
     "searchFeatures": "Search features",
     "downloadingUpdateFile": "Downloading update file...",
-    "onlyFewArrowsLeft": "Only %arrows% arrows left!",
-    "noArrowsLeft": "No Arrows Left!",
+    "onlyFewArrowsLeft": "§cLast %arrows% %arrowsType% §cleft!",
+    "noArrowsLeft": "§cNo %arrowsType% §cleft!",
     "chooseAColor": "Choose a Color",
     "selectedColor": "Selected Color",
     "setHexColor": "Set Hex Color",
@@ -329,9 +344,17 @@
     "entityOutlinesRequirement": "Requires Shaders, Fast Render, and Antialiasing to be OFF",
     "version": "Version",
     "invalidFeatureConfiguration": "Invalid configuration detected for feature %featureName%, resetting its settings to default values.",
-    "fileFetchFailed": "%modName% has failed to fetch %number% file(s). Please copy the error using the button below and report it in our Discord server.",
+    "fileFetchFailed": "%modName% has failed to fetch %number% file(s). Check the console or latest.log for detailed information.",
     "copy": "Copy",
-    "copied": "Copied!"
+    "copied": "Copied!",
+    "retry": "Retry",
+    "fallbackCdnUsed": "Could not reach main CDN. Some resources were fetched from fallback CDN.",
+    "reloadingResources": "Reloading resources...",
+    "resourcesReloaded": "Resources reloaded.",
+    "locationEditGui": {
+      "atOpening": "TIP: You can adjust the scaling with the mouse wheel and increase the ratio by holding Shift. With right mouse click you can change the scale of that feature to default. You can also move the hovered feature with the WASD or arrow keys. You can also open the settings by hovering your mouse over the feature you want to open the settings for and clicking the mouse wheel button."
+    },
+    "classColoredTeammateRequirement": "Entity Outlines and Outline Dungeon Teammate features must be enabled"
   },
   "discordStatus": {
     "titleNone": "None",
@@ -489,8 +512,8 @@
         "toggleSlayerTrackerLogging": {
           "help": "Toggles showing counted slayer tracker drops"
         },
-        "toggleMagmaTimerLogging": {
-          "help": "Toggles logging magma boss timer debug messages"
+        "toggleSkyBlockOreLogging": {
+          "help": "Toggles logging of mined SkyBlock ore"
         },
         "version": {
           "help": "Shows the mod's version"
@@ -539,9 +562,9 @@
           "disabled": "Slayer tracker drops will no longer be shown.",
           "enabled": "Slayer tracker drops will now be shown."
         },
-        "toggleMagmaTimerLogging": {
-          "disabled": "Magma boss timer messages will no longer be logged.",
-          "enabled": "Magma boss timer messages will now be logged."
+        "toggleSkyBlockOreLogging": {
+          "disabled": "Mined SkyBlock ores will no longer be shown.",
+          "enabled": "Mined SkyBlock ores will now be shown."
         },
         "version": {
           "hoverText": "Click to put in chat so you can copy."
@@ -693,7 +716,8 @@
   "keyBindings": {
     "developerCopyNBT": "Copy NBT",
     "increaseDungeonMapZoom": "Dungeon Map Zoom In",
-    "decreaseDungeonMapZoom": "Dungeon Map Zoom Out"
+    "decreaseDungeonMapZoom": "Dungeon Map Zoom Out",
+    "answerAbiphoneOrOption": "Answer the Abiphone or Option"
   },
   "dragonTracker": {
     "protector": "Protector",

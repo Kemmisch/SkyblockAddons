@@ -9,6 +9,11 @@
     "rarity": "RARE",
     "spawnMessage": "Your Chumcap Bucket trembles, it's an Agarimoo."
   },
+  "BLOATED_MITHRIL_GRUBBER": {
+    "name": "Mithril Grubber",
+    "rarity": "UNCOMMON",
+    "spawnMessage": "A leech of the mines surfaces... you've caught a Bloated Mithril Grubber."
+  },
   "BLUE_SHARK": {
     "name": "Blue Shark",
     "rarity": "UNCOMMON",
@@ -69,6 +74,11 @@
     "rarity": "EPIC",
     "spawnMessage": "You've discovered a Guardian Defender of the sea."
   },
+  "LARGE_MITHRIL_GRUBBER": {
+    "name": "Mithril Grubber",
+    "rarity": "UNCOMMON",
+    "spawnMessage": "A leech of the mines surfaces... you've caught a Large Mithril Grubber."
+  },
   "LAVA_BLAZE": {
     "name": "Lava Blaze",
     "rarity": "EPIC",
@@ -99,20 +109,30 @@
     "rarity": "RARE",
     "spawnMessage": "From beneath the lava appears a Magma Slug."
   },
+  "MEDIUM_MITHRIL_GRUBBER": {
+    "name": "Mithril Grubber",
+    "rarity": "UNCOMMON",
+    "spawnMessage": "A leech of the mines surfaces... you've caught a Medium Mithril Grubber."
+  },
+  "MITHRIL_GRUBBER": {
+    "name": "Mithril Grubber",
+    "rarity": "UNCOMMON",
+    "spawnMessage": "A leech of the mines surfaces... you've caught a Mithril Grubber."
+  },
   "MOOGMA": {
     "name": "Moogma",
     "rarity": "RARE",
     "spawnMessage": "You hear a faint Moo from the lava... A Moogma appears."
   },
-  "NIGHT_SQUID": {
-    "name": "Night Squid",
-    "rarity": "COMMON",
-    "spawnMessage": "Pitch Darkness reveals you've caught a Night Squid."
-  },
   "NIGHTMARE": {
     "name": "Nightmare",
     "rarity": "RARE",
     "spawnMessage": "You hear trotting from beneath the waves, you caught a Nightmare."
+  },
+  "NIGHT_SQUID": {
+    "name": "Night Squid",
+    "rarity": "COMMON",
+    "spawnMessage": "Pitch Darkness reveals you've caught a Night Squid."
   },
   "NURSE_SHARK": {
     "name": "Nurse Shark",

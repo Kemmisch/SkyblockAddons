@@ -1,15 +1,32 @@
 package codes.biscuit.skyblockaddons.utils;
 
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import net.minecraft.client.renderer.GLAllocation;
 import net.minecraft.client.renderer.GlStateManager;
 import org.lwjgl.opengl.GL11;
 
+import java.awt.Color;
 import java.nio.FloatBuffer;
 
 public class ColorUtils {
 
     private static final SkyblockColor SKYBLOCK_COLOR = new SkyblockColor();
     private static final FloatBuffer colourBuffer = GLAllocation.createDirectFloatBuffer(16);
+
+    public static boolean areAllFeaturesChroma() {
+        for (Feature loopFeature : Feature.values()) {
+            if (loopFeature.isGuiFeature() && loopFeature.getFeatureGuiData().getDefaultColor() != null) {
+                if (!loopFeature.isChroma()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public static int getDefaultBlue(int alpha) {
+        return new Color(160, 225, 229, alpha).getRGB();
+    }
 
     /**
      * Binds a color given its rgb integer representation.
@@ -107,6 +124,15 @@ public class ColorUtils {
 
     public static int getColor(int r, int g, int b, int a) {
         return a << 24 | r << 16 | g << 8 | b;
+    }
+
+    public static float[] getNormalizedRGBA(int color) {
+        return new float[] {
+                (float) (color >> 16 & 255) / 255.0F,
+                (float) (color >> 8 & 255) / 255.0F,
+                (float) (color & 255) / 255.0F,
+                (float) (color >> 24 & 255) / 255.0F,
+        };
     }
 
     public static SkyblockColor getDummySkyblockColor(int color) {

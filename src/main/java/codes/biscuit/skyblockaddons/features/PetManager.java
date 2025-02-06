@@ -2,12 +2,12 @@ package codes.biscuit.skyblockaddons.features;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
 import codes.biscuit.skyblockaddons.core.InventoryType;
-import codes.biscuit.skyblockaddons.core.Rarity;
+import codes.biscuit.skyblockaddons.core.PetInfo;
+import codes.biscuit.skyblockaddons.core.SkyblockRarity;
 import codes.biscuit.skyblockaddons.utils.ColorCode;
 import codes.biscuit.skyblockaddons.utils.ItemUtils;
 import codes.biscuit.skyblockaddons.utils.TextUtils;
-import codes.biscuit.skyblockaddons.utils.pojo.PetInfo;
-import codes.biscuit.skyblockaddons.utils.skyblockdata.PetItem;
+import codes.biscuit.skyblockaddons.utils.data.skyblockdata.PetItem;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.Getter;
@@ -27,7 +27,8 @@ import java.util.regex.Pattern;
 
 public class PetManager {
     //private static final Pattern SELECTED_PET_PATTERN = Pattern.compile("(?:§.)*Selected pet: §(?<rarity>\\w)(?<pet>[\\w ]+)");
-    private static final Pattern PET_LEVEL_PATTERN = Pattern.compile("(§7\\[Lvl )(?<level>\\d+)(] )(§8\\[§.(?<cosmeticLevel>\\d+))?(.*)");
+    private static final Pattern PET_LEVEL_PATTERN = Pattern.compile("(§7\\[Lvl )(?<level>\\d+)(] )(§8\\[§.)?(?<cosmeticLevel>\\d+)?(.*)");
+    private static final Pattern FAVORITE_PATTERN = Pattern.compile("§e⭐ ");
 
     /** The PetManager instance.*/
     @Getter private static final PetManager instance = new PetManager();
@@ -73,7 +74,8 @@ public class PetManager {
                     if (pet == null) continue;
 
                     // For unique index slot: add 45 slot = 5 row for each page except first page
-                    int sbaPetIndex = i + 45 * (pageNum - 1);
+                    // If pageNum == 0, there is no page indicator in the title, there is only 1 pet page.
+                    int sbaPetIndex = i + 45 * (pageNum == 0 ? 0 : pageNum - 1);
 
                     Pet oldPet = main.getPetCacheManager().getPet(sbaPetIndex);
 
@@ -90,7 +92,7 @@ public class PetManager {
     }
 
     /**
-     * When Autopet messages came to chat it will trigger {@link codes.biscuit.skyblockaddons.listeners.PlayerListener#AUTOPET_PATTERN}
+     * When Autopet messages came to chat it will trigger {@code PlayerListener.AUTOPET_PATTERN}
      * We will get groups from that Pattern, and we will set current pet from these groups values.
      * @param levelString level string
      * @param rarityColor rarity color string
@@ -100,7 +102,7 @@ public class PetManager {
     public void findCurrentPetFromAutopet(String levelString, String rarityColor, String petName) {
         int level = Integer.parseInt(levelString);
         ColorCode color = ColorCode.getByChar(rarityColor.charAt(0));
-        Rarity rarity = Rarity.getByColorCode(color);
+        SkyblockRarity rarity = SkyblockRarity.getByColorCode(color);
 
         for (Pet pet : main.getPetCacheManager().getPetCache().getPetMap().values()) {
             if (pet.displayName.contains(petName) && pet.petLevel == level && pet.petInfo.getPetRarity() == rarity) {
@@ -110,7 +112,7 @@ public class PetManager {
     }
 
     /**
-     * When levelled up messages came to chat it will trigger {@link codes.biscuit.skyblockaddons.listeners.PlayerListener#PET_LEVELED_UP_PATTERN}
+     * When levelled up messages came to chat it will trigger {@code PlayerListener#PET_LEVELED_UP_PATTERN}
      * We will get groups from that Pattern, and we will update petCache and set current pet from these groups values.
      * @param newLevelString level string
      * @param rarityColor rarity color string
@@ -120,7 +122,7 @@ public class PetManager {
     public void updateAndSetCurrentLevelledPet(String newLevelString, String rarityColor, String petName) {
         int newLevel = Integer.parseInt(newLevelString);
         ColorCode color = ColorCode.getByChar(rarityColor.charAt(0));
-        Rarity rarity = Rarity.getByColorCode(color);
+        SkyblockRarity rarity = SkyblockRarity.getByColorCode(color);
         Pet currentPet = main.getPetCacheManager().getCurrentPet();
 
         for (Map.Entry<Integer, Pet> petEntry : main.getPetCacheManager().getPetCache().getPetMap().entrySet()) {
@@ -130,15 +132,17 @@ public class PetManager {
             if (pet.displayName.contains(petName) && pet.petInfo.getPetRarity() == rarity) {
                 Matcher m = PET_LEVEL_PATTERN.matcher(pet.displayName);
                 if (m.matches()) {
-                    boolean isCurrentPet = currentPet.petInfo.getUniqueId() == pet.petInfo.getUniqueId();
+                    boolean isCurrentPet = currentPet != null && currentPet.petInfo.getUniqueId() == pet.petInfo.getUniqueId();
                     String cosmeticLevelGroup = m.group("cosmeticLevel");
 
-                    if (cosmeticLevelGroup == null && pet.petLevel == newLevel - 1) {
-                        pet.petLevel = newLevel;
-                        pet.displayName = m.group(1) + newLevelString + m.group(3) + m.group(6);
-                    } else if (cosmeticLevelGroup != null && newLevel > pet.petLevel) {
-                        int cosmeticLevel = newLevel - pet.petLevel;
-                        pet.displayName = m.group(1) + m.group(2) + m.group(3) + m.group(4) + cosmeticLevel + m.group(6);
+                    if (pet.petLevel < newLevel) {
+                        if (cosmeticLevelGroup != null) {
+                            int cosmeticLevel = newLevel - pet.petLevel;
+                            pet.displayName = m.group(1) + m.group(2) + m.group(3) + m.group(4) + cosmeticLevel + m.group(6);
+                        } else {
+                            pet.petLevel = newLevel;
+                            pet.displayName = m.group(1) + newLevelString + m.group(3) + m.group(6);
+                        }
                     } else {
                         continue;
                     }
@@ -174,11 +178,16 @@ public class PetManager {
      * Parses the petInfo in the pet's ExtraAttributes to JsonObject after than converts to {@link Pet}
      * @param stack The pet ItemStack
      * @return {@link Pet}
-     * @see codes.biscuit.skyblockaddons.utils.pojo.PetInfo
+     * @see PetInfo
      * @author Fix3dll
      */
     private Pet getPetFromItemStack(ItemStack stack) {
-        String displayName = stack.getDisplayName();
+        String displayName;
+        if (stack.hasDisplayName()) {
+            displayName = FAVORITE_PATTERN.matcher(stack.getDisplayName()).replaceAll("");
+        } else {
+            return null;
+        }
 
         int petLevel = TextUtils.getPetLevelFromDisplayName(displayName);
         if (petLevel == -1) return null;
@@ -221,12 +230,12 @@ public class PetManager {
         }
     }
 
-    public Rarity getPetItemRarityFromId(String petItemId) {
+    public SkyblockRarity getPetItemRarityFromId(String petItemId) {
         PetItem petItem = petItems.get(petItemId);
         if (petItem != null) {
             return petItem.getRarity();
         } else {
-            return Rarity.ADMIN;
+            return SkyblockRarity.ADMIN;
         }
     }
 

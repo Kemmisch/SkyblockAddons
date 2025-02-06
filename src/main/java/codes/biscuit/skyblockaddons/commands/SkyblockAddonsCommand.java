@@ -1,11 +1,11 @@
 package codes.biscuit.skyblockaddons.commands;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.features.slayertracker.SlayerBoss;
 import codes.biscuit.skyblockaddons.features.slayertracker.SlayerDrop;
 import codes.biscuit.skyblockaddons.features.slayertracker.SlayerTracker;
-import codes.biscuit.skyblockaddons.misc.SkyblockKeyBinding;
+import codes.biscuit.skyblockaddons.core.SkyblockKeyBinding;
 import codes.biscuit.skyblockaddons.utils.ColorCode;
 import codes.biscuit.skyblockaddons.utils.DevUtils;
 import codes.biscuit.skyblockaddons.utils.EnumUtils;
@@ -13,7 +13,6 @@ import codes.biscuit.skyblockaddons.utils.Utils;
 import com.google.common.base.CaseFormat;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import net.minecraft.client.settings.GameSettings;
 import net.minecraft.command.*;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.event.HoverEvent;
@@ -37,8 +36,10 @@ public class SkyblockAddonsCommand extends CommandBase {
     private static final String HEADER = "§7§m----------------§7[ §b§lSkyblockAddons §7]§7§m----------------";
     private static final String FOOTER = "§7§m-----------------------------------------------------";
     private static final String[] SUBCOMMANDS = {"help", "edit", "folder", "resetZealotCounter", "set", "slayer",
-            "version", "dev", "brand", "copyBlock", "copyEntity", "copySidebar", "copyTabList", "pd", "reload",
-            "reloadConfig", "reloadRes", "toggleActionBarLogging", "toggleSlayerTrackerLogging", "copyOpenGL"};
+            "version", "reload", "reloadConfig", "reloadRes", "dev", "brand", "copyBlock", "copyEntity", "copySidebar",
+            "copyTabList", "pd", "toggleActionBarLogging", "toggleSlayerTrackerLogging", "copyOpenGL",
+            "toggleSkyBlockOreLogging"
+    };
 
     private final SkyblockAddons main = SkyblockAddons.getInstance();
 
@@ -68,38 +69,14 @@ public class SkyblockAddonsCommand extends CommandBase {
      * the main usage string.
      */
     public String getCommandUsage(ICommandSender sender) {
-        String usage =
-                HEADER + "\n" +
-                "§b● " + CommandSyntax.BASE + " §7-§r " + getMessage("commands.usage.sba.base.help") + "\n" +
-                "§b● " + CommandSyntax.HELP + " §7-§r " + getMessage("commands.usage.sba.help.help") + "\n" +
-                "§b● " + CommandSyntax.EDIT + " §7-§r " + getMessage("commands.usage.sba.edit.help") + "\n" +
-                "§b● " + CommandSyntax.SET + " §7-§r " + getMessage("commands.usage.sba.set.zealotCounter.help") + "\n" +
-                "§b● " + CommandSyntax.RESET_ZEALOT_COUNTER + " §7-§r " + getMessage("commands.usage.sba.resetZealotCounter.help") + "\n" +
-                "§b● " + CommandSyntax.FOLDER + " §7-§r " + getMessage("commands.usage.sba.folder.help") + "\n" +
-                "§b● " + CommandSyntax.SLAYER + " §7-§r " + getMessage("commands.usage.sba.slayer.help") + "\n" +
-                "§b● " + CommandSyntax.VERSION + " §7-§r " + getMessage("commands.usage.sba.version.help") + "\n" +
-                "§b● " + CommandSyntax.DEV + " §7-§r " + getMessage("commands.usage.sba.dev.help");
-
-        if (main.getConfigValues().isEnabled(Feature.DEVELOPER_MODE)) {
-            usage = usage + "\n" +
-                    "§b● " + CommandSyntax.BRAND + " §7- " + getDevPrefixFormatted() + getMessage("commands.usage.sba.brand.help") + "\n" +
-                    "§b● " + CommandSyntax.COPY_BLOCK + " §7- " + getDevPrefixFormatted() +  getMessage("commands.usage.sba.copyBlock.help") + "\n" +
-                    "§b● " + CommandSyntax.COPY_ENTITY + " §7- " + getDevPrefixFormatted() + getMessage("commands.usage.sba.copyEntity.help") + "\n" +
-                    "§b● " + CommandSyntax.COPY_SIDEBAR + " §7- " + getDevPrefixFormatted() + getMessage("commands.usage.sba.copySidebar.help") + "\n" +
-                    "§b● " + CommandSyntax.COPY_TAB_LIST + " §7- " + getDevPrefixFormatted() + getMessage("commands.usage.sba.copyTabList.help") + "\n" +
-                    "§b● " + CommandSyntax.COPY_OPENGL + " §7- " + getDevPrefixFormatted() + getMessage("commands.usage.sba.copyOpenGL.help") + "\n" +
-                    "§b● " + CommandSyntax.PD + " §7- " + getDevPrefixFormatted() + getMessage("commands.usage.sba.printDeaths.help") + "\n" +
-                    "§b● " + CommandSyntax.RELOAD + " §7- " + getDevPrefixFormatted() + getMessage("commands.usage.sba.reload.help") + "\n" +
-                    "§b● " + CommandSyntax.RELOAD_CONFIG + " §7- " + getDevPrefixFormatted() + getMessage("commands.usage.sba.reloadConfig.help") + "\n" +
-                    "§b● " + CommandSyntax.RELOAD_RES + " §7- " + getDevPrefixFormatted() + getMessage("commands.usage.sba.reloadRes.help") + "\n" +
-                    "§b● " + CommandSyntax.TOGGLE_ACTION_BAR_LOGGING + " §7- " + getDevPrefixFormatted() + getMessage("commands.usage.sba.toggleActionBarLogging.help") + "\n" +
-                    "§b● " + CommandSyntax.TOGGLE_SLAYER_TRACKER_LOGGING + " §7- " + getDevPrefixFormatted() + getMessage("commands.usage.sba.toggleSlayerTrackerLogging.help")
-            ;
+        StringBuilder builder = new StringBuilder(HEADER);
+        for (Commands command : Commands.values()) {
+            if (command.devMode && Feature.DEVELOPER_MODE.isDisabled()) continue;
+            builder.append("\n").append(command.createMenuDescriptionLine());
         }
+        builder.append("\n").append(FOOTER);
 
-        usage = usage + "\n" + FOOTER;
-
-        return usage;
+        return builder.toString();
     }
 
     /**
@@ -118,7 +95,7 @@ public class SkyblockAddonsCommand extends CommandBase {
             }
         }
 
-        return HEADER + "\n" + SubCommandUsage.valueOf(subCommand) + "\n" + FOOTER;
+        return HEADER + "\n" + Commands.valueOf(subCommand) + "\n" + FOOTER;
     }
 
     public List<String> addTabCompletionOptions(ICommandSender sender, String[] args, BlockPos pos) {
@@ -139,7 +116,7 @@ public class SkyblockAddonsCommand extends CommandBase {
                     }
                     return getListOfStringsMatchingLastWord(args, slayers);
 
-                } else if (main.getConfigValues().isEnabled(Feature.DEVELOPER_MODE)) {
+                } else if (Feature.DEVELOPER_MODE.isEnabled()) {
                     if (args[0].equalsIgnoreCase("copyEntity")) {
                         return getListOfStringsMatchingLastWord(args, DevUtils.ALL_ENTITY_NAMES);
                     } else if (args[0].equalsIgnoreCase("copySidebar")) {
@@ -187,7 +164,7 @@ public class SkyblockAddonsCommand extends CommandBase {
                     try {
                         main.getUtils().sendMessage(getSubCommandUsage(args[1]), false);
                     } catch (IllegalArgumentException e) {
-                        throw new CommandException(getMessage("commands.errors.wrongUsage.subCommandNotFound", args[1]));
+                        main.getUtils().sendErrorMessage(getMessage("commands.errors.wrongUsage.subCommandNotFound", args[1]));
                     }
                 } else {
                     main.getUtils().sendMessage(getCommandUsage(sender), false);
@@ -197,12 +174,15 @@ public class SkyblockAddonsCommand extends CommandBase {
                 main.getRenderListener().setGuiToOpen(EnumUtils.GUIType.EDIT_LOCATIONS, 0, null);
 
             } else if (args[0].equalsIgnoreCase("dev") || args[0].equalsIgnoreCase("nbt")) {
-                SkyblockKeyBinding devModeKeyBinding = main.getDeveloperCopyNBTKey();
                 Feature.DEVELOPER_MODE.setEnabled(!Feature.DEVELOPER_MODE.isEnabled());
 
-                if (main.getConfigValues().isEnabled(Feature.DEVELOPER_MODE)) {
-                    main.getUtils().sendMessage(ColorCode.GREEN + getMessage("commands.responses.sba.dev.enabled",
-                            GameSettings.getKeyDisplayString(devModeKeyBinding.getKeyCode())));
+                if (Feature.DEVELOPER_MODE.isEnabled()) {
+                    main.getUtils().sendMessage(
+                            ColorCode.GREEN + getMessage(
+                                    "commands.responses.sba.dev.enabled",
+                                    SkyblockKeyBinding.DEVELOPER_COPY_NBT.getKeyName()
+                            )
+                    );
                 } else {
                     main.getUtils().sendMessage(ColorCode.RED + getMessage("commands.responses.sba.dev.disabled"));
                 }
@@ -287,20 +267,26 @@ public class SkyblockAddonsCommand extends CommandBase {
                         );
                 versionChatComponent.setChatStyle(versionChatStyle);
 
-                /*
-                 Include MAJOR.MINOR.PATCH-pre-release in the chat message and add build number if it's defined when
-                 the user chooses to copy for diagnostic purposes.
-                 */
+                 // Include MAJOR.MINOR.PATCH-pre-release in the chat message and add build number if it's defined when
+                 // the user chooses to copy for diagnostic purposes.
                 main.getUtils().sendMessage(versionChatComponent, true);
             } else if (args[0].equalsIgnoreCase("internal")) {
                 if (args.length > 2) {
                     if (args[1].equalsIgnoreCase("copy")) {
                         DevUtils.copyStringToClipboard(
                                 Arrays.stream(args).skip(2).collect(Collectors.joining(" ")),
-                                getMessage("messages.copied"));
+                                getMessage("messages.copied")
+                        );
                     }
                 }
-            } else if (main.getConfigValues().isEnabled(Feature.DEVELOPER_MODE)) {
+            } else if (args[0].equalsIgnoreCase("reload")) {
+                DevUtils.reloadAll();
+            } else if (args[0].equalsIgnoreCase("reloadConfig")) {
+                main.getConfigValuesManager().setFirstLoad(true); // Trigger extra checks for corrupted values.
+                DevUtils.reloadConfig();
+            } else if (args[0].equalsIgnoreCase("reloadRes")) {
+                DevUtils.reloadResources();
+            } else if (Feature.DEVELOPER_MODE.isEnabled()) {
                 if (args[0].equalsIgnoreCase("brand")) {
                     String serverBrand = DevUtils.getServerBrand();
 
@@ -358,12 +344,6 @@ public class SkyblockAddonsCommand extends CommandBase {
                             main.getDungeonManager().getAlternateDeaths());
                     main.getUtils().sendMessage(EnumChatFormatting.WHITE + "Tab Deaths: " + EnumChatFormatting.GOLD +
                             main.getDungeonManager().getPlayerListInfoDeaths());
-                } else if (args[0].equalsIgnoreCase("reload")) {
-                    DevUtils.reloadAll();
-                } else if (args[0].equalsIgnoreCase("reloadConfig")) {
-                    DevUtils.reloadConfig();
-                } else if (args[0].equalsIgnoreCase("reloadRes")) {
-                    DevUtils.reloadResources();
                 } else if (args[0].equalsIgnoreCase("toggleActionBarLogging")) {
                     DevUtils.setLoggingActionBarMessages(!DevUtils.isLoggingActionBarMessages());
 
@@ -375,14 +355,24 @@ public class SkyblockAddonsCommand extends CommandBase {
                                 "commands.responses.sba.toggleActionBarLogging.disabled"));
                     }
                 } else if (args[0].equalsIgnoreCase("toggleSlayerTrackerLogging")) {
-                    DevUtils.setLoggingSlayerTrackerMessages(!DevUtils.isLoggingSlayerTrackerMessages());
+                    DevUtils.setLoggingSlayerTracker(!DevUtils.isLoggingSlayerTracker());
 
-                    if (DevUtils.isLoggingSlayerTrackerMessages()) {
+                    if (DevUtils.isLoggingSlayerTracker()) {
                         main.getUtils().sendMessage(ColorCode.GREEN + getMessage(
                                 "commands.responses.sba.toggleSlayerTrackerLogging.enabled"));
                     } else {
                         main.getUtils().sendMessage(ColorCode.RED + getMessage(
                                 "commands.responses.sba.toggleSlayerTrackerLogging.disabled"));
+                    }
+                } else if (args[0].equalsIgnoreCase("toggleSkyBlockOreLogging")) {
+                    DevUtils.setLoggingSkyBlockOre(!DevUtils.isLoggingSkyBlockOre());
+
+                    if (DevUtils.isLoggingSkyBlockOre()) {
+                        main.getUtils().sendMessage(ColorCode.GREEN + getMessage(
+                                "commands.responses.sba.toggleSkyBlockOreLogging.enabled"));
+                    } else {
+                        main.getUtils().sendMessage(ColorCode.RED + getMessage(
+                                "commands.responses.sba.toggleSkyBlockOreLogging.disabled"));
                     }
                 } else {
                     throw new WrongUsageException(getMessage(
@@ -402,22 +392,14 @@ public class SkyblockAddonsCommand extends CommandBase {
     }
 
     /*
-    Returns the Dev prefix in brackets and with formatting codes.
-    This simplifies the string for localization to just "Dev".
-     */
-    private String getDevPrefixFormatted() {
-        return "§e(" + getMessage("commands.usage.sba.dev.prefix") + ")§r ";
-    }
-
-    /*
      Gets tab completion options listing all sub-commands.
      Developer mode commands are not included if developer mode is disabled.
      */
     private List<String> getSubCommandTabCompletionOptions(String[] args) {
-        if (main.getConfigValues().isEnabled(Feature.DEVELOPER_MODE)) {
+        if (Feature.DEVELOPER_MODE.isEnabled()) {
             return getListOfStringsMatchingLastWord(args, SUBCOMMANDS);
         } else {
-            return getListOfStringsMatchingLastWord(args, Arrays.copyOf(SUBCOMMANDS, 7));
+            return getListOfStringsMatchingLastWord(args, Arrays.copyOf(SUBCOMMANDS, 10));
         }
     }
 
@@ -453,68 +435,46 @@ public class SkyblockAddonsCommand extends CommandBase {
         }
     }
 
-    // Syntax definitions for this command and its sub-commands
-    @Getter @AllArgsConstructor
-    private enum CommandSyntax {
-        BASE("/sba"),
-        HELP("/sba help [command]"),
-        EDIT("/sba edit"),
-        SET("/sba set <zealots|eyes|totalZealots §eor§b total> <number>"),
-        FOLDER("/sba folder"),
-        DEV("/sba dev"),
-        BRAND("/sba brand"),
-        COPY_ENTITY("/sba copyEntity [entityNames] [radius: integer]"),
-        COPY_SIDEBAR("/sba copySidebar [formatted: boolean]"),
-        COPY_TAB_LIST("/sba copyTabList"),
-        COPY_OPENGL("/sba copyOpenGL"),
-        TOGGLE_ACTION_BAR_LOGGING("/sba toggleActionBarLogging"),
-        SLAYER("/sba slayer <boss> <stat> <number>"),
-        COPY_BLOCK("/sba copyBlock"),
-        RELOAD("/sba reload"),
-        RELOAD_CONFIG("/sba reloadConfig"),
-        RELOAD_RES("/sba reloadRes"),
-        RESET_ZEALOT_COUNTER("/sba resetZealotCounter"),
-        PD("/sba pd"),
-        VERSION("/sba version"),
-        TOGGLE_SLAYER_TRACKER_LOGGING("/sba toggleSlayerTrackerLogging")
+    @AllArgsConstructor
+    private enum Commands {
+        BASE("/sba", "commands.usage.sba.base.help", null),
+        HELP("/sba help [command]", "commands.usage.sba.help.help", Collections.singletonList(CommandOption.COMMAND)),
+        EDIT("/sba edit", "commands.usage.sba.edit.help", null),
+        SET("/sba set <zealots|eyes|totalZealots §eor§b total> <number>", "commands.usage.sba.set.zealotCounter.detailedHelp.description", Arrays.asList(CommandOption.ZEALOTS, CommandOption.EYES, CommandOption.TOTAL_ZEALOTS)),
+        RESET_ZEALOT_COUNTER("/sba resetZealotCounter", "commands.usage.sba.resetZealotCounter.help", null),
+        FOLDER("/sba folder", "commands.usage.sba.folder.help", null),
+        SLAYER("/sba slayer <boss> <stat> <number>", "commands.usage.sba.slayer.detailedHelp.description", Arrays.asList(CommandOption.SLAYER_BOSS, CommandOption.SLAYER_STAT, CommandOption.SLAYER_NUMBER)),
+        VERSION("/sba version", "commands.usage.sba.version.help", null),
+        RELOAD("/sba reload", "commands.usage.sba.reload.help", null),
+        RELOAD_CONFIG("/sba reloadConfig", "commands.usage.sba.reloadConfig.help", null),
+        RELOAD_RES("/sba reloadRes", "commands.usage.sba.reloadRes.help", null),
+        DEV("/sba dev", "commands.usage.sba.dev.detailedHelp.description", null),
+        BRAND("/sba brand", "commands.usage.sba.brand.help", true,null),
+        COPY_ENTITY("/sba copyEntity [entityNames] [radius: integer]", "commands.usage.sba.copyEntity.detailedHelp.description", true, Arrays.asList(CommandOption.ENTITY_NAMES, CommandOption.RADIUS)),
+        COPY_SIDEBAR("/sba copySidebar [formatted: boolean]", "commands.usage.sba.copySidebar.detailedHelp.description", true, Collections.singletonList(CommandOption.FORMATTED)),
+        COPY_TAB_LIST("/sba copyTabList", "commands.usage.sba.copyTabList.detailedHelp.description", true, null),
+        COPY_OPENGL("/sba copyOpenGL", "commands.usage.sba.copyOpenGL.detailedHelp.description", true, null),
+        COPY_BLOCK("/sba copyBlock", "commands.usage.sba.copyBlock.help", true, null),
+        PD("/sba pd", "commands.usage.sba.printDeaths.help", true, null),
+        TOGGLE_ACTION_BAR_LOGGING("/sba toggleActionBarLogging", "commands.usage.sba.toggleActionBarLogging.help", true, null),
+        TOGGLE_SLAYER_TRACKER_LOGGING("/sba toggleSlayerTrackerLogging", "commands.usage.sba.toggleSlayerTrackerLogging.help", true, null),
+        TOGGLE_SKYBLOCK_ORE_LOGGING("/sba toggleSkyBlockOreLogging", "commands.usage.sba.toggleSkyBlockOreLogging.help", true, null),
         ;
 
         private final String syntax;
-
-        @Override
-        public String toString() {
-            return syntax;
-        }
-    }
-
-    // Usage strings for all the sub-commands of this command
-    @AllArgsConstructor
-    private enum SubCommandUsage {
-        HELP(CommandSyntax.HELP, "commands.usage.sba.help.help", Collections.singletonList(CommandOption.COMMAND)),
-        EDIT(CommandSyntax.EDIT, "commands.usage.sba.edit.help", null),
-        SET(CommandSyntax.SET, "commands.usage.sba.set.zealotCounter.detailedHelp.description", Arrays.asList(CommandOption.ZEALOTS, CommandOption.EYES, CommandOption.TOTAL_ZEALOTS)),
-        RESET_ZEALOT_COUNTER(CommandSyntax.RESET_ZEALOT_COUNTER, "commands.usage.sba.resetZealotCounter.help", null),
-        FOLDER(CommandSyntax.FOLDER, "commands.usage.sba.folder.help", null),
-        DEV(CommandSyntax.DEV, "commands.usage.sba.dev.detailedHelp.description", null),
-        BRAND(CommandSyntax.BRAND, "commands.usage.sba.brand.help", null),
-        COPY_ENTITY(CommandSyntax.COPY_ENTITY, "commands.usage.sba.copyEntity.detailedHelp.description", Arrays.asList(CommandOption.ENTITY_NAMES, CommandOption.RADIUS)),
-        COPY_SIDEBAR(CommandSyntax.COPY_SIDEBAR, "commands.usage.sba.copySidebar.detailedHelp.description", Collections.singletonList(CommandOption.FORMATTED)),
-        COPY_TAB_LIST(CommandSyntax.COPY_TAB_LIST, "commands.usage.sba.copyTabList.detailedHelp.description", null),
-        COPY_OPENGL(CommandSyntax.COPY_OPENGL, "commands.usage.sba.copyOpenGL.detailedHelp.description", null),
-        TOGGLE_ACTION_BAR_LOGGING(CommandSyntax.TOGGLE_ACTION_BAR_LOGGING, "commands.usage.sba.toggleActionBarLogging.help", null),
-        SLAYER(CommandSyntax.SLAYER, "commands.usage.sba.slayer.detailedHelp.description", Arrays.asList(CommandOption.SLAYER_BOSS, CommandOption.SLAYER_STAT, CommandOption.SLAYER_NUMBER)),
-        COPY_BLOCK(CommandSyntax.COPY_BLOCK, "commands.usage.sba.copyBlock.help", null),
-        RELOAD(CommandSyntax.RELOAD, "commands.usage.sba.reload.help", null),
-        RELOAD_CONFIG(CommandSyntax.RELOAD_CONFIG, "commands.usage.sba.reloadConfig.help", null),
-        RELOAD_RES(CommandSyntax.RELOAD_RES, "commands.usage.sba.reloadRes.help", null),
-        PD(CommandSyntax.PD, "commands.usage.sba.printDeaths.help", null),
-        VERSION(CommandSyntax.VERSION, "commands.usage.sba.version.help", null),
-        TOGGLE_SLAYER_TRACKER_LOGGING(CommandSyntax.TOGGLE_SLAYER_TRACKER_LOGGING, "commands.usage.sba.toggleSlayerTrackerLogging.help", null),
-        ;
-
-        private final CommandSyntax syntax;
         private final String descriptionTranslationKey;
+        private final boolean devMode;
         private final List<CommandOption> options;
+
+        Commands(String syntax, String descriptionTranslationKey, List<CommandOption> options) {
+            this(syntax, descriptionTranslationKey, false, options);
+        }
+
+        public String createMenuDescriptionLine() {
+            return "§b● " + this.syntax + " §7-§r "
+                    + (devMode ? "§e(" + getMessage("commands.usage.sba.dev.prefix") + ")§r "  : "")
+                    + getMessage(this.descriptionTranslationKey);
+        }
 
         /**
          * <p>Returns a formatted usage string for the sub-command with the name of this Enum constant.</p>

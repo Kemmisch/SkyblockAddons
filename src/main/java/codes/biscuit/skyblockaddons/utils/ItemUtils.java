@@ -1,22 +1,21 @@
 package codes.biscuit.skyblockaddons.utils;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Rarity;
+import codes.biscuit.skyblockaddons.core.PetInfo;
+import codes.biscuit.skyblockaddons.core.SkyblockRarity;
 import codes.biscuit.skyblockaddons.core.ItemType;
 import codes.biscuit.skyblockaddons.features.backpacks.BackpackColor;
-import codes.biscuit.skyblockaddons.utils.objects.ReturnValue;
-import codes.biscuit.skyblockaddons.utils.pojo.PetInfo;
-import codes.biscuit.skyblockaddons.utils.skyblockdata.CompactorItem;
-import codes.biscuit.skyblockaddons.utils.skyblockdata.ContainerData;
-import codes.biscuit.skyblockaddons.utils.skyblockdata.Rune;
+import codes.biscuit.skyblockaddons.utils.data.skyblockdata.CompactorItem;
+import codes.biscuit.skyblockaddons.utils.data.skyblockdata.ContainerData;
+import codes.biscuit.skyblockaddons.core.Rune;
 import lombok.Setter;
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemPickaxe;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.*;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraftforge.common.util.Constants;
 import org.apache.commons.lang3.text.WordUtils;
 
@@ -26,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,6 +44,7 @@ public class ItemUtils {
      * <p><i>Recombobulated Special items have exception for rarity pattern.<i/></p>
      */
     private static final Pattern ITEM_TYPE_AND_RARITY_PATTERN = Pattern.compile("§l(?<rarity>[A-Z]+(?: SPECIAL)?) ?(?<type>[A-Z ]+)?(?:§[0-9a-f]§l§ka)?$");
+    private static final Pattern BACKPACK_SLOT_PATTERN = Pattern.compile("Backpack Slot (?<slot>\\d+)");
     @Setter private static Map<String, CompactorItem> compactorItems;
     @Setter private static Map<String, ContainerData> containers;
 
@@ -55,7 +56,7 @@ public class ItemUtils {
      * @param item the Skyblock item to check, can't be {@code null}
      * @return the rarity of the item if a valid rarity is found, or {@code null} if item is {@code null} or no valid rarity is found
      */
-    public static Rarity getRarity(ItemStack item) {
+    public static SkyblockRarity getRarity(ItemStack item) {
         if (item == null) {
             throw new NullPointerException("The item cannot be null!");
         }
@@ -93,8 +94,13 @@ public class ItemUtils {
      */
     public static ItemStack getPersonalCompactorItemStack(String personalCompactorSkyblockID) {
         CompactorItem compactorItem = compactorItems.get(personalCompactorSkyblockID);
-        return compactorItem != null ? compactorItem.getItemStack() : ItemUtils.createSkullItemStack("§7Unknown (" + personalCompactorSkyblockID + ")", Collections.singletonList("§6also biscut was here hi!!"), personalCompactorSkyblockID,
-                "724c64a2-fc8b-4842-852b-6b4c2c6ef241", "e0180f4aeb6929f133c9ff10476ab496f74c46cf8b3be6809798a974929ccca3");
+        return compactorItem != null ? compactorItem.getItemStack() : ItemUtils.createSkullItemStack(
+                EnumChatFormatting.GOLD + personalCompactorSkyblockID,
+                Collections.singletonList("§cSBA cannot found this item!"),
+                personalCompactorSkyblockID,
+                "577218c5-279a-4c2b-9afe-2dbd419e7937",
+                "ecc58cb55b1a11e6d88c2d4d1a6366c23887dee26304bda412c4a51825f199"
+        );
     }
 
     /**
@@ -105,29 +111,6 @@ public class ItemUtils {
      */
     public static ContainerData getContainerData(String skyblockID) {
         return containers.get(skyblockID);
-    }
-
-    /**
-     * Returns the Skyblock Item ID of a given Skyblock item
-     *
-     * @param item the Skyblock item to check
-     * @return the Skyblock Item ID of this item or {@code null} if this isn't a valid Skyblock item
-     */
-    public static String getSkyblockItemID(ItemStack item) {
-        if (item == null) {
-            return null;
-        }
-
-        NBTTagCompound extraAttributes = getExtraAttributes(item);
-        if (extraAttributes == null) {
-            return null;
-        }
-
-        if (!extraAttributes.hasKey("id", ItemUtils.NBT_STRING)) {
-            return null;
-        }
-
-        return extraAttributes.getString("id");
     }
 
     /**
@@ -147,37 +130,76 @@ public class ItemUtils {
         return item.getSubCompound("ExtraAttributes", false);
     }
 
-
     /**
      * Returns the {@code enchantments} compound tag from the item's NBT data.
-     *
-     * @param item the item to get the tag from
+     * @param extraAttributes the ExtraAttributes to get the tag from
      * @return the item's {@code enchantments} compound tag or {@code null} if the item doesn't have one
      */
-    public static NBTTagCompound getEnchantments(ItemStack item) {
-        NBTTagCompound extraAttributes = getExtraAttributes(item);
+    public static NBTTagCompound getEnchantments(NBTTagCompound extraAttributes) {
         return extraAttributes == null ? null : extraAttributes.getCompoundTag("enchantments");
     }
 
     /**
-     * @return The Skyblock reforge of a given itemstack
+     * Returns the {@code enchantments} compound tag from the {@link ItemStack}.
+     * @param itemStack the {@link ItemStack} to get the tag from
+     * @return the item's {@code enchantments} compound tag or {@code null} if the item doesn't have one
      */
-    public static String getReforge(ItemStack item) {
-        if (item.hasTagCompound()) {
-            NBTTagCompound extraAttributes = item.getTagCompound();
+    public static NBTTagCompound getEnchantments(ItemStack itemStack) {
+        NBTTagCompound extraAttributes = getExtraAttributes(itemStack);
+        return getEnchantments(extraAttributes);
+    }
+
+    /**
+     * Returns the {@code attributes} compound tag from the item's NBT data.
+     * @param extraAttributes the ExtraAttributes to get the tag from
+     * @return the item's {@code attributes} compound tag or {@code null} if the item doesn't have one
+     */
+    public static NBTTagCompound getAttributes(NBTTagCompound extraAttributes) {
+        return extraAttributes == null ? null : extraAttributes.getCompoundTag("attributes");
+    }
+
+    /**
+     * Returns the {@code attributes} compound tag from the {@link ItemStack}.
+     * @param itemStack the {@link ItemStack} to get the tag from
+     * @return the item's {@code attributes} compound tag or {@code null} if the item doesn't have one
+     */
+    public static NBTTagCompound getAttributes(ItemStack itemStack) {
+        NBTTagCompound extraAttributes = getExtraAttributes(itemStack);
+        return getAttributes(extraAttributes);
+    }
+
+    /**
+     * Returns the Skyblock Reforge of a given {@link ItemStack}
+     * @param itemStack the itemStack to check
+     * @return the Reforge (in lowercase) of this itemStack or {@code null} if this isn't a valid item or reforge
+     */
+    public static String getReforge(ItemStack itemStack) {
+        if (itemStack.hasTagCompound()) {
+            NBTTagCompound extraAttributes = itemStack.getTagCompound();
             if (extraAttributes.hasKey("ExtraAttributes")) {
-                extraAttributes = extraAttributes.getCompoundTag("ExtraAttributes");
-                if (extraAttributes.hasKey("modifier")) {
-                    String reforge = WordUtils.capitalizeFully(extraAttributes.getString("modifier"));
-
-                    reforge = reforge.replace("_sword", ""); //fixes reforges like "Odd_sword"
-                    reforge = reforge.replace("_bow", "");
-                    reforge = reforge.replace("Warped", "Hyper"); // exception
-
-                    return reforge;
-                }
+                return getReforge(extraAttributes.getCompoundTag("ExtraAttributes"));
             }
         }
+
+        return null;
+    }
+
+    /**
+     * Returns the Skyblock Reforge of a given Skyblock Extra Attributes NBT Compound
+     * @param extraAttributes the NBT to check
+     * @return the Reforge (in lowercase) of this item or {@code null} if this isn't a valid item or reforge
+     */
+    public static String getReforge(NBTTagCompound extraAttributes) {
+        if (extraAttributes != null && extraAttributes.hasKey("modifier", NBT_STRING)) {
+            String reforge = WordUtils.capitalizeFully(extraAttributes.getString("modifier"));
+
+            reforge = reforge.replace("_sword", ""); //fixes reforges like "Odd_sword"
+            reforge = reforge.replace("_bow", "");
+            reforge = reforge.replace("Warped", "Hyper"); // exception
+
+            return reforge;
+        }
+
         return null;
     }
 
@@ -209,7 +231,6 @@ public class ItemUtils {
         return itemStack.getItem() instanceof ItemPickaxe || isDrill(itemStack);
     }
 
-
     /**
      * Checks if the given {@code ItemStack} is a drill. It works by checking for the presence of the {@code drill_fuel} NBT tag,
      * which only drills have.
@@ -224,17 +245,24 @@ public class ItemUtils {
 
         NBTTagCompound extraAttributes = getExtraAttributes(itemStack);
 
-        if (extraAttributes != null) {
-            return extraAttributes.hasKey("drill_fuel", TAG_INT);
-        } else {
-            return false;
-        }
+        return extraAttributes != null && extraAttributes.hasKey("drill_fuel", TAG_INT);
     }
 
+    /**
+     * Returns the Skyblock Item ID of a given Skyblock item
+     * @param item the Skyblock item to check
+     * @return the Skyblock Item ID of this item or {@code null} if this isn't a valid Skyblock item
+     */
+    public static String getSkyblockItemID(ItemStack item) {
+        if (item == null) {
+            return null;
+        }
+
+        return getSkyblockItemID(getExtraAttributes(item));
+    }
 
     /**
      * Returns the Skyblock Item ID of a given Skyblock Extra Attributes NBT Compound
-     *
      * @param extraAttributes the NBT to check
      * @return the Skyblock Item ID of this item or {@code null} if this isn't a valid Skyblock NBT
      */
@@ -243,38 +271,11 @@ public class ItemUtils {
             return null;
         }
 
-        String itemId = extraAttributes.getString("id");
-        if (itemId.isEmpty()) {
+        if (!extraAttributes.hasKey("id", ItemUtils.NBT_STRING)) {
             return null;
         }
 
-        return itemId;
-    }
-
-    /**
-     * Checks if the given {@code ItemStack} is a backpack
-     *
-     * @param stack the {@code ItemStack} to check
-     * @return {@code true} if {@code stack} is a backpack, {@code false} otherwise
-     */
-    public static boolean isBackpack(ItemStack stack) {
-        NBTTagCompound extraAttributes = getExtraAttributes(stack);
-        ContainerData containerData = containers.get(getSkyblockItemID(extraAttributes));
-        return containerData != null && containerData.isBackpack();
-    }
-
-    /**
-     * Checks if the given {@code ItemStack} is a builders wand
-     * See {@link codes.biscuit.skyblockaddons.mixins.hooks.PlayerControllerMPHook#onWindowClick(int, int, int, EntityPlayer, ReturnValue)}
-     * for a commented-out implementation (may come back in the future).
-     *
-     * @param stack the {@code ItemStack} to check
-     * @return {@code true} if {@code stack} is a backpack, {@code false} otherwise
-     */
-    public static boolean isBuildersWand(ItemStack stack) {
-        NBTTagCompound extraAttributes = getExtraAttributes(stack);
-        ContainerData containerData = containers.get(getSkyblockItemID(extraAttributes));
-        return containerData != null && containerData.isBuildersWand();
+        return extraAttributes.getString("id");
     }
 
     /**
@@ -292,13 +293,13 @@ public class ItemUtils {
                     return BackpackColor.valueOf(extraAttributes.getString(containerData.getColorTag()));
                 } catch (IllegalArgumentException ignored) {
                 }
-                return BackpackColor.WHITE;
+                return BackpackColor.DEFAULT;
             } else if (extraAttributes.hasKey("backpack_color")) {
                 try {
                     return BackpackColor.valueOf(extraAttributes.getString("backpack_color"));
                 } catch (IllegalArgumentException ignored) {
                 }
-                return BackpackColor.WHITE;
+                return BackpackColor.DEFAULT;
             }
         }
 
@@ -306,17 +307,20 @@ public class ItemUtils {
     }
 
     /**
-     * Returns the Skyblock Reforge of a given Skyblock Extra Attributes NBT Compound
-     *
-     * @param extraAttributes the NBT to check
-     * @return the Reforge (in lowercase) of this item or {@code null} if this isn't a valid Skyblock NBT or reforge
+     * Gets slot number from the {@link ItemStack} on the slot.
+     * <br>See also {@link ItemUtils#BACKPACK_SLOT_PATTERN}
+     * @param itemStack Backpack {@link ItemStack}
+     * @return returns the slot number as integer else 0
      */
-    public static String getReforge(NBTTagCompound extraAttributes) {
-        if (extraAttributes != null && extraAttributes.hasKey("modifier", NBT_STRING)) {
-            return extraAttributes.getString("modifier");
+    public static int getBackpackSlot(ItemStack itemStack) {
+        if (itemStack == null || !itemStack.hasDisplayName()) return 0;
+
+        Matcher matcher = BACKPACK_SLOT_PATTERN.matcher(itemStack.getDisplayName());
+        if (matcher.find()) {
+            return Integer.parseInt(matcher.group("slot"));
         }
 
-        return null;
+        return 0;
     }
 
     /**
@@ -339,8 +343,17 @@ public class ItemUtils {
     }
 
     /**
+     * Returns a {@link PetInfo} from the {@link ItemStack}
+     * @param itemStack the {@link ItemStack} to check
+     * @return A {@link PetInfo} or {@code null} if it isn't a pet
+     */
+    public static PetInfo getPetInfo(ItemStack itemStack) {
+        NBTTagCompound extraAttributes = getExtraAttributes(itemStack);
+        return getPetInfo(extraAttributes);
+    }
+
+    /**
      * Returns a {@link PetInfo} from the ExtraAttributes Skyblock data
-     *
      * @param extraAttributes the Skyblock Data to check
      * @return A {@link PetInfo} or {@code null} if it isn't a pet
      */
@@ -588,6 +601,24 @@ public class ItemUtils {
         return 0;
     }
 
+    public static UUID getUuid(ItemStack itemStack) {
+        NBTTagCompound extraAttributes = getExtraAttributes(itemStack);
+
+        if (extraAttributes != null && extraAttributes.hasKey("uuid")) {
+            return UUID.fromString(extraAttributes.getString("uuid"));
+        }
+
+        return null;
+    }
+
+    public static boolean isQuiverArrow(ItemStack itemStack) {
+        NBTTagCompound extraAttributes = getExtraAttributes(itemStack);
+        if (extraAttributes != null && extraAttributes.hasKey("quiver_arrow")) {
+            return extraAttributes.getBoolean("quiver_arrow");
+        }
+        return false;
+    }
+
     /**
      * Returns the rarity of a Skyblock item given its lore. This method takes the item's lore as a string list as input.
      * This method is split up from the method that takes the {@code ItemStack} instance for easier unit testing.
@@ -595,7 +626,7 @@ public class ItemUtils {
      * @param lore the {@code List<String>} containing the item's lore
      * @return the rarity of the item if a valid rarity is found, or {@code null} if item is {@code null} or no valid rarity is found
      */
-    private static Rarity getRarity(List<String> lore) {
+    private static SkyblockRarity getRarity(List<String> lore) {
         // Start from the end since the rarity is usually the last line or one of the last.
         for (int i = lore.size() - 1; i >= 0 ; i--) {
             String currentLine = lore.get(i);
@@ -604,7 +635,7 @@ public class ItemUtils {
             if (rarityMatcher.find()) {
                 String rarity = rarityMatcher.group("rarity");
 
-                for (Rarity itemRarity : Rarity.values()) {
+                for (SkyblockRarity itemRarity : SkyblockRarity.values()) {
                     // Use a "startsWith" check here because "VERY SPECIAL" has two words and only "VERY" is matched.
                     if (itemRarity.getLoreName().startsWith(rarity)) {
                         return itemRarity;

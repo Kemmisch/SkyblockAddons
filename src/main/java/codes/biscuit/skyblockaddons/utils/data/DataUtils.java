@@ -2,9 +2,14 @@ package codes.biscuit.skyblockaddons.utils.data;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
 import codes.biscuit.skyblockaddons.asm.SkyblockAddonsASMTransformer;
+import codes.biscuit.skyblockaddons.core.Island;
 import codes.biscuit.skyblockaddons.core.Language;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.features.PetManager;
-import codes.biscuit.skyblockaddons.utils.pojo.OnlineData;
+import codes.biscuit.skyblockaddons.utils.LocationUtils;
+import codes.biscuit.skyblockaddons.utils.data.skyblockdata.EnchantmentsData;
+import codes.biscuit.skyblockaddons.utils.data.skyblockdata.LocationData;
+import codes.biscuit.skyblockaddons.utils.data.skyblockdata.OnlineData;
 import codes.biscuit.skyblockaddons.core.Translations;
 import codes.biscuit.skyblockaddons.core.seacreatures.SeaCreature;
 import codes.biscuit.skyblockaddons.core.seacreatures.SeaCreatureManager;
@@ -12,39 +17,42 @@ import codes.biscuit.skyblockaddons.exceptions.DataLoadingException;
 import codes.biscuit.skyblockaddons.features.SkillXpManager;
 import codes.biscuit.skyblockaddons.features.cooldowns.CooldownManager;
 import codes.biscuit.skyblockaddons.features.enchants.EnchantManager;
-import codes.biscuit.skyblockaddons.misc.scheduler.ScheduledTask;
-import codes.biscuit.skyblockaddons.misc.scheduler.SkyblockRunnable;
 import codes.biscuit.skyblockaddons.utils.ItemUtils;
 import codes.biscuit.skyblockaddons.utils.Utils;
 import codes.biscuit.skyblockaddons.utils.data.requests.*;
-import codes.biscuit.skyblockaddons.utils.skyblockdata.CompactorItem;
-import codes.biscuit.skyblockaddons.utils.skyblockdata.ContainerData;
-import codes.biscuit.skyblockaddons.utils.skyblockdata.PetItem;
+import codes.biscuit.skyblockaddons.utils.data.skyblockdata.CompactorItem;
+import codes.biscuit.skyblockaddons.utils.data.skyblockdata.ContainerData;
+import codes.biscuit.skyblockaddons.utils.data.skyblockdata.PetItem;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import lombok.Getter;
+import net.minecraft.client.Minecraft;
 import net.minecraft.crash.CrashReport;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.*;
 import net.minecraftforge.fml.client.FMLClientHandler;
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.NoConnectionReuseStrategy;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.FutureRequestExecutionMetrics;
 import org.apache.http.impl.client.FutureRequestExecutionService;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpRequestFutureTask;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.concurrent.ExecutionException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -55,9 +63,7 @@ import java.util.concurrent.ThreadFactory;
 public class DataUtils {
 
     private static final Gson gson = SkyblockAddons.getGson();
-
     private static final Logger logger = SkyblockAddons.getLogger();
-
     private static final SkyblockAddons main = SkyblockAddons.getInstance();
 
     private static final RequestConfig requestConfig = RequestConfig.custom()
@@ -83,21 +89,19 @@ public class DataUtils {
     private static final FutureRequestExecutionService futureRequestExecutionService =
             new FutureRequestExecutionService(httpClient, executorService);
 
+    @Getter private static final FutureRequestExecutionMetrics executionServiceMetrics =
+            futureRequestExecutionService.metrics();
+
     private static final ArrayList<RemoteFileRequest<?>> remoteRequests = new ArrayList<>();
 
-    @Getter
-    private static final ArrayList<HttpRequestFutureTask<?>> httpRequestFutureTasks = new ArrayList<>();
+    private static final TreeMap<String, Throwable> failedRequests = new TreeMap<>();
 
-    @Getter
-    private static final HashMap<RemoteFileRequest<?>, Throwable> failedRequests = new HashMap<>();
-    
-    /** 
-     * Main CDN doesn't work for some users.
-     * Use fallback CDN if a request fails twice or user is in China or Hong Kong.
-     */
-    static boolean useFallbackCDN;
+    static boolean fallbackCDNUsed = false;
 
-    // Whether the failed requests error was shown in chat, used to make it show only once per session
+    static final HashSet<String> failedUris = new HashSet<>();
+
+    // Whether the failed requests error was shown in chat,
+    // used to make it show only once per session except reloadRes command
     private static boolean failureMessageShown = false;
 
     /**
@@ -106,22 +110,16 @@ public class DataUtils {
      * the environment variable {@code FETCH_DATA_ONLINE}.
      */
     public static final boolean USE_ONLINE_DATA = !SkyblockAddonsASMTransformer.isDeobfuscated() ||
-            System.getenv().containsKey("FETCH_DATA_ONLINE");
+            Boolean.getBoolean("sba.data.online");
 
     private static String path;
 
-    private static LocalizedStringsRequest localizedStringsRequest = null;
-
-    private static ScheduledTask languageLoadingTask = null;
+    private static LocalizationsRequest localizedStringsRequest = null;
 
     static {
-        String country = Locale.getDefault().getCountry();
-        if (country.equals("CN") || country.equals("HK")) {
-            useFallbackCDN = true;
-        }
         connectionManager.setMaxTotal(5);
         connectionManager.setDefaultMaxPerRoute(5);
-        registerRemoteRequests();
+        registerNewRemoteRequests();
     }
 
     //TODO: Migrate all data file loading to this class
@@ -133,6 +131,7 @@ public class DataUtils {
      */
     public static void readLocalAndFetchOnline() {
         readLocalFileData();
+        DataUtils.loadOnlineData(new MayorRequest()); // API data
 
         if (USE_ONLINE_DATA) {
             fetchFromOnline();
@@ -164,7 +163,7 @@ public class DataUtils {
                         StandardCharsets.UTF_8)){
             Translations.setDefaultLangJson(gson.fromJson(inputStreamReader, JsonObject.class));
         } catch (Exception ex) {
-           handleLocalFileReadException(path,ex);
+            handleLocalFileReadException(path,ex);
         }
 
         // Containers
@@ -202,7 +201,7 @@ public class DataUtils {
         try (   InputStream inputStream = DataUtils.class.getResourceAsStream(path);
                 InputStreamReader inputStreamReader = new InputStreamReader(Objects.requireNonNull(inputStream),
                         StandardCharsets.UTF_8)){
-            EnchantManager.setEnchants(gson.fromJson(inputStreamReader, new TypeToken<EnchantManager.Enchants>() {}.getType()));
+            EnchantManager.setEnchants(gson.fromJson(inputStreamReader, new TypeToken<EnchantmentsData>() {}.getType()));
         } catch (Exception ex) {
             handleLocalFileReadException(path,ex);
         }
@@ -236,6 +235,35 @@ public class DataUtils {
         } catch (Exception ex) {
             handleLocalFileReadException(path,ex);
         }
+
+        // Locations Data
+        path = "/locations.json";
+        try (InputStream inputStream = DataUtils.class.getResourceAsStream(path);
+             InputStreamReader inputStreamReader = new InputStreamReader(Objects.requireNonNull(inputStream), StandardCharsets.UTF_8)){
+            HashMap<String, LocationData> result = gson.fromJson(
+                    inputStreamReader, new TypeToken<HashMap<String, LocationData>>() {}.getType()
+            );
+            for (Map.Entry<String, LocationData> entry : result.entrySet()) {
+                for (Island island : Island.values()) {
+                    if (island.getMode().equalsIgnoreCase(entry.getKey())) {
+                        island.setLocationData(entry.getValue());
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            handleLocalFileReadException(path,ex);
+        }
+
+        // Slayer Locations Data
+        path = "/slayerLocations.json";
+        try (InputStream inputStream = DataUtils.class.getResourceAsStream(path);
+             InputStreamReader inputStreamReader = new InputStreamReader(Objects.requireNonNull(inputStream), StandardCharsets.UTF_8)){
+            LocationUtils.setSlayerLocations(
+                    gson.fromJson(inputStreamReader, new TypeToken<HashMap<String, Set<String>>>() {}.getType())
+            );
+        } catch (Exception ex) {
+            handleLocalFileReadException(path,ex);
+        }
     }
 
     /*
@@ -245,57 +273,30 @@ public class DataUtils {
     private static void fetchFromOnline() {
         for (RemoteFileRequest<?> request : remoteRequests) {
             request.execute(futureRequestExecutionService);
-        }
-        
-        if (useFallbackCDN) {
-            logger.warn("Could not reach main CDN. Some resources were fetched from fallback CDN.");
-        }
-    }
+            if (request.getURL().contains(DataConstants.CDN_BASE_URL)) {
+                SkyblockAddons.getInstance().getScheduler().scheduleAsyncTask(scheduledTask -> {
+                    if (request.isDone() && failedUris.contains(request.getURL())) {
+                        request.setFallbackCDN();
+                        request.execute(futureRequestExecutionService);
 
-    /**
-     * Loads the received online data files into the mod.
-     *
-     * @see SkyblockAddons#preInit(FMLPreInitializationEvent)
-     */
-    public static void loadOnlineData() {
-        Iterator<RemoteFileRequest<?>> requestIterator = remoteRequests.iterator();
+                        if (!fallbackCDNUsed) {
+                            if (Minecraft.getMinecraft().thePlayer != null) {
+                                main.getUtils().sendMessage(Translations.getMessage("messages.fallbackCdnUsed"));
+                            } else {
+                                logger.warn(Translations.getMessage("messages.fallbackCdnUsed"));
+                            }
+                            fallbackCDNUsed = true;
+                        }
 
-        while (requestIterator.hasNext()) {
-            RemoteFileRequest<?> request = requestIterator.next();
-
-            if (!request.isDone()) {
-                handleOnlineFileLoadException(request,
-                        new RuntimeException(String.format("Request for \"%s\" didn't finish in time for mod init.",
-                                getFileNameFromUrlString(request.getURL()))));
-            }
-
-            try {
-                loadOnlineFile(request);
-                requestIterator.remove();
-            } catch (InterruptedException | ExecutionException | NullPointerException | IllegalArgumentException e) {
-                handleOnlineFileLoadException(Objects.requireNonNull(request), e);
+                        scheduledTask.cancel();
+                    }
+                }, 0, 2);
             }
         }
     }
 
     public static void loadOnlineData(RemoteFileRequest<?> request) {
         request.execute(futureRequestExecutionService);
-
-        try {
-            loadOnlineFile(request);
-        } catch (InterruptedException | ExecutionException | NullPointerException | IllegalArgumentException e) {
-            logger.error(String.format("Failed to load \"%s\" from the server.",
-                    getFileNameFromUrlString(request.getURL())));
-        }
-    }
-
-    /**
-     * Loads a received online data file into the mod.
-     *
-     * @param request the {@code RemoteFileRequest} for the file
-     */
-    public static void loadOnlineFile(RemoteFileRequest<?> request) throws ExecutionException, InterruptedException {
-        request.load();
     }
 
     /**
@@ -305,7 +306,8 @@ public class DataUtils {
      * @param loadOnlineStrings Loads local and online strings if {@code true}, loads only local strings if {@code false}
      */
     public static void loadLocalizedStrings(boolean loadOnlineStrings) {
-        loadLocalizedStrings(main.getConfigValues().getLanguage(), loadOnlineStrings);
+        Language currentLanguage = (Language) Feature.LANGUAGE.getValue();
+        loadLocalizedStrings(currentLanguage, loadOnlineStrings);
     }
 
     /**
@@ -325,8 +327,8 @@ public class DataUtils {
         try (   InputStream inputStream = DataUtils.class.getClassLoader().getResourceAsStream(path);
                 InputStreamReader inputStreamReader = new InputStreamReader(Objects.requireNonNull(inputStream),
                         StandardCharsets.UTF_8)){
-            main.getConfigValues().setLanguageConfig(gson.fromJson(inputStreamReader, JsonObject.class));
-            main.getConfigValues().setLanguage(language);
+            Translations.setLanguageJson(gson.fromJson(inputStreamReader, JsonObject.class));
+            Feature.LANGUAGE.setValue(language);
         } catch (Exception ex) {
             handleLocalFileReadException(path,ex);
         }
@@ -337,71 +339,48 @@ public class DataUtils {
                 if (!futureTask.isDone()) {
                     futureTask.cancel(false);
                 }
-            } else if (languageLoadingTask != null) {
-                languageLoadingTask.cancel();
             }
 
-            localizedStringsRequest = new LocalizedStringsRequest(language);
+            localizedStringsRequest = new LocalizationsRequest(language);
             localizedStringsRequest.execute(futureRequestExecutionService);
-            languageLoadingTask = main.getNewScheduler().scheduleLimitedRepeatingTask(new SkyblockRunnable() {
-                @Override
-                public void run() {
-                    if (localizedStringsRequest != null) {
-                        if (localizedStringsRequest.isDone()) {
-                            try {
-                                loadOnlineFile(localizedStringsRequest);
-                            } catch (InterruptedException | ExecutionException | NullPointerException | IllegalArgumentException e) {
-//                                handleOnlineFileLoadException(Objects.requireNonNull(localizedStringsRequest), e);
-                            }
-                            cancel();
-                        }
-                    } else {
-                        cancel();
-                    }
-                }
-            }, 10, 20, 8);
         }
 
         // logger.info("Finished loading localized strings.");
     }
 
-    // TODO: Shut it down and restart it as needed?
     /**
-     * Shuts down {@link DataUtils#futureRequestExecutionService} and the underlying {@code ExecutorService} and
-     * {@code ClosableHttpClient}.
-     */
-    public static void shutdownExecutorService() {
-        try {
-            futureRequestExecutionService.close();
-            logger.debug("Executor service shut down.");
-        } catch (IOException e) {
-            logger.error("Failed to shut down executor service.", e);
-        }
-    }
-
-    /**
-     * Displays a message when the player first joins Skyblock asking them to report failed requests to our Discord server.
+     * Displays a message when the player first joins Skyblock.
      */
     public static void onSkyblockJoined() {
         if (!failureMessageShown && !failedRequests.isEmpty()) {
             StringBuilder errorMessageBuilder = new StringBuilder("Failed Requests:\n");
 
-            for (Map.Entry<RemoteFileRequest<?>, Throwable> failedRequest : failedRequests.entrySet()) {
-                errorMessageBuilder.append(failedRequest.getKey().getURL()).append("\n");
+            for (Map.Entry<String, Throwable> failedRequest : failedRequests.entrySet()) {
+                errorMessageBuilder.append(failedRequest.getKey()).append("\n");
                 errorMessageBuilder.append(failedRequest.getValue().toString()).append("\n");
             }
 
             ChatComponentText failureMessageComponent = new ChatComponentText(
                     Translations.getMessage(
                             "messages.fileFetchFailed",
-                            EnumChatFormatting.AQUA + SkyblockAddons.MOD_NAME + EnumChatFormatting.RED, failedRequests.size()
+                            EnumChatFormatting.AQUA + SkyblockAddons.MOD_NAME + EnumChatFormatting.RED,
+                            failedRequests.size()
                     )
             );
             IChatComponent buttonRowComponent = new ChatComponentText("[" + Translations.getMessage("messages.copy") + "]")
-                    .setChatStyle(new ChatStyle().setColor(EnumChatFormatting.WHITE).setChatClickEvent(
-                            new ClickEvent(
-                                    ClickEvent.Action.RUN_COMMAND,
-                                    String.format("/sba internal copy %s", errorMessageBuilder)
+                    .setChatStyle(
+                            new ChatStyle().setColor(EnumChatFormatting.WHITE).setChatClickEvent(
+                                    new ClickEvent(
+                                            ClickEvent.Action.RUN_COMMAND,
+                                            String.format("/sba internal copy %s", errorMessageBuilder)
+                                    )
+                            )
+                    );
+            buttonRowComponent.appendText("  ");
+            buttonRowComponent.appendSibling(new ChatComponentText("[" + Translations.getMessage("messages.retry") + "]")
+                    .setChatStyle(
+                            new ChatStyle().setColor(EnumChatFormatting.WHITE).setChatClickEvent(
+                                    new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/sba reloadRes")
                             )
                     )
             );
@@ -409,6 +388,7 @@ public class DataUtils {
 
             main.getUtils().sendMessage(failureMessageComponent, false);
             failureMessageShown = true;
+            failedRequests.clear();
         }
     }
 
@@ -425,7 +405,17 @@ public class DataUtils {
         return url.substring(fileNameIndex, queryParamIndex > fileNameIndex ? queryParamIndex : url.length());
     }
 
-    private static void registerRemoteRequests() {
+    /**
+     * After clearing the list, it constructs new requests and adds them to the list.
+     * It also resets the {@link DataUtils#fallbackCDNUsed}, {@link DataUtils#failureMessageShown} and
+     * {@link DataUtils#failedUris} values.
+     */
+    public static void registerNewRemoteRequests() {
+        remoteRequests.clear();
+        failedUris.clear();
+        fallbackCDNUsed = false;
+        failureMessageShown = false;
+
         remoteRequests.add(new OnlineDataRequest());
 //        if (SkyblockAddons.getInstance().getConfigValues().getLanguage() != Language.ENGLISH) {
 //            remoteRequests.add(new LocalizedStringsRequest(SkyblockAddons.getInstance().getConfigValues().getLanguage()));
@@ -436,8 +426,9 @@ public class DataUtils {
         remoteRequests.add(new EnchantmentsRequest());
         remoteRequests.add(new CooldownsRequest());
         remoteRequests.add(new SkillXpRequest());
-        remoteRequests.add(new MayorRequest());
         remoteRequests.add(new PetItemsRequest());
+        remoteRequests.add(new LocationsRequest());
+        remoteRequests.add(new SlayerLocationsRequest());
     }
 
     /**
@@ -454,8 +445,10 @@ public class DataUtils {
         if (FMLClientHandler.instance().isLoading()) {
             throw new DataLoadingException(filePath, exception);
         } else {
-            CrashReport crashReport = CrashReport.makeCrashReport(exception, String.format("Loading data file at %s",
-                    filePath));
+            CrashReport crashReport = CrashReport.makeCrashReport(
+                    exception,
+                    String.format("Loading data file at %s", filePath)
+            );
             throw new ReportedException(crashReport);
         }
     }
@@ -467,13 +460,12 @@ public class DataUtils {
      * If the game is initialized, it crashes the game with a crash report containing the file name and the stacktrace
      * of the given {@code Throwable}.
      *
-     * @param request the {@code RemoteFileRequest} for the file that failed to load
+     * @param urlString the requestPath for the file that failed to load
      * @param exception the exception that occurred
      */
-    private static void handleOnlineFileLoadException(RemoteFileRequest<?> request, Throwable exception) {
-        String url = request.getURL();
-        String fileName = getFileNameFromUrlString(url);
-        failedRequests.put(request, exception);
+    static void handleOnlineFileLoadException(String urlString, Throwable exception, boolean essential) {
+        String fileName = getFileNameFromUrlString(urlString);
+        failedRequests.put(urlString, exception);
 
         // The loader encountered a file name it didn't expect.
         if (exception instanceof IllegalArgumentException) {
@@ -481,14 +473,15 @@ public class DataUtils {
             return;
         }
 
-        if (request.isEssential()) {
+        if (essential) {
             if (FMLClientHandler.instance().isLoading()) {
-                throw new DataLoadingException(url, exception);
+                throw new DataLoadingException(urlString, exception);
             } else {
                 // Don't include URL because Fire strips URLs.
-                CrashReport crashReport = CrashReport.makeCrashReport(exception, String.format("Loading online data file" +
-                                " at %s",
-                        fileName));
+                CrashReport crashReport = CrashReport.makeCrashReport(
+                        exception,
+                        String.format("Loading online data file at %s", fileName)
+                );
                 throw new ReportedException(crashReport);
             }
         } else {

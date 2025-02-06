@@ -1,11 +1,11 @@
 package codes.biscuit.skyblockaddons.features.slayertracker;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.utils.DevUtils;
 import codes.biscuit.skyblockaddons.utils.EnumUtils;
 import codes.biscuit.skyblockaddons.utils.ItemUtils;
-import codes.biscuit.skyblockaddons.utils.skyblockdata.Rune;
+import codes.biscuit.skyblockaddons.core.Rune;
 import lombok.Getter;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.nbt.NBTTagCompound;
@@ -17,8 +17,6 @@ public class SlayerTracker {
 
     @Getter private static final SlayerTracker instance = new SlayerTracker();
     private static final SkyblockAddons main = SkyblockAddons.getInstance();
-
-    @Deprecated private transient long lastSlayerCompleted = -1;
 
     public int getSlayerKills(SlayerBoss slayerBoss) {
         SlayerTrackerData slayerTrackerData = main.getPersistentValuesManager().getPersistentValues().getSlayerTracker();
@@ -36,12 +34,12 @@ public class SlayerTracker {
      * @return {@code true} if at least one slayer tracker is enabled, {@code false} otherwise
      */
     public boolean isTrackerEnabled() {
-        return main.getConfigValues().isEnabled(Feature.REVENANT_SLAYER_TRACKER) ||
-                main.getConfigValues().isEnabled(Feature.TARANTULA_SLAYER_TRACKER) ||
-                main.getConfigValues().isEnabled(Feature.SVEN_SLAYER_TRACKER) ||
-                main.getConfigValues().isEnabled(Feature.VOIDGLOOM_SLAYER_TRACKER) ||
-                main.getConfigValues().isEnabled(Feature.INFERNO_SLAYER_TRACKER) ||
-                main.getConfigValues().isEnabled(Feature.RIFTSTALKER_SLAYER_TRACKER);
+        return Feature.REVENANT_SLAYER_TRACKER.isEnabled() ||
+                Feature.TARANTULA_SLAYER_TRACKER.isEnabled() ||
+                Feature.SVEN_SLAYER_TRACKER.isEnabled() ||
+                Feature.VOIDGLOOM_SLAYER_TRACKER.isEnabled() ||
+                Feature.INFERNO_SLAYER_TRACKER.isEnabled() ||
+                Feature.RIFTSTALKER_SLAYER_TRACKER.isEnabled();
     }
 
     /**
@@ -53,7 +51,6 @@ public class SlayerTracker {
             SlayerTrackerData slayerTrackerData = main.getPersistentValuesManager().getPersistentValues().getSlayerTracker();
             slayerTrackerData.getSlayerKills().put(slayerBoss, slayerTrackerData.getSlayerKills().getOrDefault(slayerBoss, 0) + 1);
             slayerTrackerData.setLastKilledBoss(slayerBoss);
-            lastSlayerCompleted = System.currentTimeMillis();
 
             main.getPersistentValuesManager().saveValues();
         }
@@ -162,7 +159,7 @@ public class SlayerTracker {
             }
             slayerTrackerData.getSlayerDropCounts().put(drop, slayerTrackerData.getSlayerDropCounts().getOrDefault(drop, 0) + amount);
 
-            if (DevUtils.isLoggingSlayerTrackerMessages()) {
+            if (DevUtils.isLoggingSlayerTracker()) {
                 main.getUtils().sendMessage(String.format("§fx%d §%s%s"
                         , amount
                         , drop.getRarity().getColorCode().getCode()

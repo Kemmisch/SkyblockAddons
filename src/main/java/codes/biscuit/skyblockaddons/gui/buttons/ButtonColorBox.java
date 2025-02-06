@@ -2,12 +2,14 @@ package codes.biscuit.skyblockaddons.gui.buttons;
 
 import codes.biscuit.skyblockaddons.core.chroma.MulticolorShaderManager;
 import codes.biscuit.skyblockaddons.core.chroma.ManualChromaManager;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.shader.ShaderManager;
 import codes.biscuit.skyblockaddons.shader.chroma.ChromaScreenShader;
 import codes.biscuit.skyblockaddons.utils.ColorCode;
 import codes.biscuit.skyblockaddons.utils.ColorUtils;
+import codes.biscuit.skyblockaddons.utils.EnumUtils.ChromaMode;
+import lombok.Getter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.WorldRenderer;
@@ -17,7 +19,8 @@ import org.lwjgl.opengl.GL11;
 /**
  * This button is for when you are choosing one of the 16 color codes.
  */
-public class ButtonColorBox extends GuiButton {
+@Getter
+public class ButtonColorBox extends SkyblockAddonsButton {
 
     public static final int WIDTH = 40;
     public static final int HEIGHT = 20;
@@ -26,56 +29,56 @@ public class ButtonColorBox extends GuiButton {
 
     public ButtonColorBox(int x, int y, ColorCode color) {
         super(0, x, y, null);
-
-        this.width = 40;
-        this.height = 20;
-
+        this.width = WIDTH;
+        this.height = HEIGHT;
         this.color = color;
     }
 
-
     @Override
     public void drawButton(Minecraft mc, int mouseX, int mouseY) {
-        hovered = mouseX > xPosition && mouseX < xPosition+width && mouseY > yPosition && mouseY < yPosition+height;
+        hovered = isHovered(mouseX, mouseY);
+
         if (color == ColorCode.CHROMA && !MulticolorShaderManager.getInstance().shouldUseChromaShaders()) {
-            if (hovered) {
-                drawChromaRect(xPosition, yPosition, xPosition + width, yPosition + height, 255);
-            }
-            else {
-                drawChromaRect(xPosition, yPosition, xPosition + width, yPosition + height, 127);
-            }
-        }
-        else {
+            drawChromaRect(xPosition, yPosition, xPosition + width, yPosition + height, hovered ? 255 : 127);
+        } else {
             if (color == ColorCode.CHROMA && MulticolorShaderManager.getInstance().shouldUseChromaShaders()) {
                 ShaderManager.getInstance().enableShader(ChromaScreenShader.class);
             }
-            if (hovered) {
-                drawRect(xPosition, yPosition, xPosition + width, yPosition + height, color.getColor());
-            } else {
-                drawRect(xPosition, yPosition, xPosition + width, yPosition + height, color.getColor(127));
-            }
+            GlStateManager.enableBlend();
+            drawRect(xPosition, yPosition, xPosition + width, yPosition + height, hovered ? color.getColor() : color.getColor(127));
+            GlStateManager.disableBlend();
             if (color == ColorCode.CHROMA && MulticolorShaderManager.getInstance().shouldUseChromaShaders()) {
                 ShaderManager.getInstance().disableShader();
             }
         }
     }
 
-    public ColorCode getColor() {
-        return color;
+    public static void drawColorRect(int left, int top, int right, int bottom, int color) {
+        boolean isChromaColor = color == ColorCode.CHROMA.getColor(ColorUtils.getAlpha(color));
+
+        GlStateManager.enableBlend();
+        if (isChromaColor) {
+            if (MulticolorShaderManager.getInstance().shouldUseChromaShaders() && Feature.CHROMA_MODE.getValue() == ChromaMode.FADE) {
+                ShaderManager.getInstance().enableShader(ChromaScreenShader.class);
+                drawRect(left, top, right, bottom, color);
+                ShaderManager.getInstance().disableShader();
+            } else {
+                drawChromaRect(left, top, right, bottom, ColorUtils.getAlpha(color));
+            }
+        } else {
+            drawRect(left, top, right, bottom, color);
+        }
+        GlStateManager.disableBlend();
     }
 
-
-    public static void drawChromaRect(int left, int top, int right, int bottom, int alpha)
-    {
-        if (left < right)
-        {
+    public static void drawChromaRect(int left, int top, int right, int bottom, int alpha) {
+        if (left < right) {
             int i = left;
             left = right;
             right = i;
         }
 
-        if (top < bottom)
-        {
+        if (top < bottom) {
             int j = top;
             top = bottom;
             bottom = j;
@@ -88,9 +91,7 @@ public class ButtonColorBox extends GuiButton {
         GlStateManager.disableTexture2D();
         GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
         GlStateManager.shadeModel(GL11.GL_SMOOTH);
-        //GlStateManager.disableAlpha();
 
-        //GlStateManager.color(1, 1, 1, 1);
         worldrenderer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
         int colorLB = ManualChromaManager.getChromaColor(left, bottom, 1);
         int colorRB = ManualChromaManager.getChromaColor(right, bottom, 1);
@@ -110,6 +111,6 @@ public class ButtonColorBox extends GuiButton {
         tessellator.draw();
         GlStateManager.shadeModel(GL11.GL_FLAT);
         GlStateManager.enableTexture2D();
-        GlStateManager.disableBlend();//GlStateManager.enableAlpha();
+        GlStateManager.disableBlend();
     }
 }

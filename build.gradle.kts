@@ -6,10 +6,10 @@ import org.apache.commons.lang3.SystemUtils
 plugins {
     idea
     java
-    id("gg.essential.loom") version ("1.4.13")
+    id("gg.essential.loom") version ("1.6.21")
     id("dev.architectury.architectury-pack200") version ("0.1.3")
-    id("io.freefair.lombok") version ("8.3")
-    id("com.github.johnrengelman.shadow") version ("8.1.1")
+    id("io.freefair.lombok") version ("8.11")
+    id("com.gradleup.shadow") version ("8.3.0")
     id("net.kyori.blossom") version ("1.3.1")
 }
 
@@ -57,6 +57,7 @@ loom {
             vmArg("-Xmx3G")
             property("mixin.debug", "true")
             property("devauth.enabled", "true")
+            property("sba.data.online", "false")
             property("fml.coreMods.load", "codes.biscuit.skyblockaddons.tweaker.SkyblockAddonsLoadingPlugin")
             programArgs("--tweakClass", "org.spongepowered.asm.launch.MixinTweaker")
             if (SystemUtils.IS_OS_MAC_OSX) {
@@ -92,6 +93,7 @@ repositories {
     gradlePluginPortal()
     maven("https://repo.spongepowered.org/maven/")
     maven("https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1")
+    maven("https://repo.hypixel.net/repository/Hypixel/")
     maven("https://jitpack.io") {
         content {
             includeGroupByRegex("com\\.github\\..*")
@@ -103,25 +105,26 @@ dependencies {
     minecraft("com.mojang:minecraft:${minecraftVersion}")
     mappings("de.oceanlabs.mcp:mcp_stable:22-1.8.9")
     forge("net.minecraftforge:forge:1.8.9-11.15.1.2318-1.8.9")
-    runtimeOnly("me.djtheredstoner:DevAuth-forge-legacy:1.2.0")
+    runtimeOnly("me.djtheredstoner:DevAuth-forge-legacy:1.2.1")
 
     bundle("org.spongepowered:mixin:0.7.11-SNAPSHOT") {
         isTransitive = false
     }
-    annotationProcessor("com.github.SpongePowered:Mixin:a60200d:processor")
+    annotationProcessor("org.spongepowered:mixin:0.8.7-SNAPSHOT:processor")
+
+    compileOnly("net.hypixel:mod-api-forge:1.0.1.1") {
+        exclude(group = "me.djtheredstoner", module = "DevAuth-forge-legacy")
+    }
+    bundle("net.hypixel:mod-api-forge-tweaker:1.0.1.1")
 
     // Discord RPC for Java https://github.com/jagrosh/DiscordIPC
-    bundle("com.github.NetheriteMiner:DiscordIPC:c75dbc9") {
+    bundle("io.github.CDAGaming:DiscordIPC:0.10.2") {
         exclude(module = "log4j")
         because("Different version conflicts with Minecraft's Log4J")
         exclude(module = "gson")
         because("Different version conflicts with Minecraft's GSON")
     }
-    bundle("com.github.BiscuitDevelopment:HypixelLocalizationLib:7122472085") {
-        exclude(module = "gson")
-        because("Different version conflicts with Minecraft's GSON")
-    }
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
 }
 
 tasks.withType(JavaCompile::class).configureEach {
@@ -134,10 +137,10 @@ tasks.register("copyLicenses", Copy::class) {
     from(project.projectDir) {
         include(
             "LICENSE",
-            "NOTICE",
             "dependencyLicenses/**"
         )
     }
+    from(".github/docs/NOTICES.md").into(project.projectDir)
     sourceSets.main.get().output.resourcesDir?.let { into(it) }
 }
 
@@ -192,7 +195,8 @@ tasks.shadowJar {
     )
 
     // Relocate Discord RPC into the main codebase
-    relocate("com.jagrosh.discordipc", "shadow.discordipc")
+    relocate("com.jagrosh.discordipc", "${project.group}.${modId}.discordipc")
+    relocate("net.hypixel.modapi.tweaker", "${project.group}.${modId}.modapi.tweaker")
 }
 
 tasks.withType(Test::class) {

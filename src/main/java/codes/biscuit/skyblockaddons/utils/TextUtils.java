@@ -1,7 +1,7 @@
 package codes.biscuit.skyblockaddons.utils;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import com.google.gson.JsonObject;
 import net.minecraft.util.IChatComponent;
 
@@ -41,11 +41,11 @@ public class TextUtils {
     private static final Pattern MAGNITUDE_PATTERN = Pattern.compile("(\\d[\\d,.]*\\d*)+([kKmMbBtT])");
     private static final Pattern TEXTURE_URL_PATTERN = Pattern.compile("\"url\"\\s?:\\s?\".+/(?<textureId>\\w+)\"");
 
-    private static final NavigableMap<Integer, String> suffixes = new TreeMap<>();
+    private static final NavigableMap<Long, String> suffixes = new TreeMap<>();
     static {
-        suffixes.put(1_000, "k");
-        suffixes.put(1_000_000, "M");
-        suffixes.put(1_000_000_000, "B");
+        suffixes.put(1_000L, "k");
+        suffixes.put(1_000_000L, "M");
+        suffixes.put(1_000_000_000L, "B");
         NUMBER_FORMAT.setMaximumFractionDigits(2);
         NUMBER_FORMAT_NO_GROUPING.setMaximumFractionDigits(2);
         NUMBER_FORMAT_NO_GROUPING.setGroupingUsed(false);
@@ -61,8 +61,7 @@ public class TextUtils {
      */
     public static String formatNumber(Number number) {
         // This null check is here for TextUtilsTests
-        if (SkyblockAddons.getInstance() == null ||
-                SkyblockAddons.getInstance().getConfigValues().isEnabled(Feature.NUMBER_SEPARATORS)) {
+        if (SkyblockAddons.getInstance() == null || Feature.NUMBER_SEPARATORS.isEnabled()) {
             return NUMBER_FORMAT.format(number);
         } else {
             return NUMBER_FORMAT_NO_GROUPING.format(number);
@@ -319,19 +318,20 @@ public class TextUtils {
         }
     }
 
-    public static String abbreviate(int number) {
-        if (number < 0) {
-            return "-" + abbreviate(-number);
+    public static String abbreviate(Number number) {
+        long longValue = number.longValue();
+        if (longValue < 0) {
+            return "-" + abbreviate(-longValue);
         }
-        if (number < 1000) {
-            return Long.toString(number);
+        if (longValue < 1000) {
+            return Long.toString(longValue);
         }
 
-        Map.Entry<Integer, String> entry = suffixes.floorEntry(number);
-        Integer divideBy = entry.getKey();
+        Map.Entry<Long, String> entry = suffixes.floorEntry(longValue);
+        Long divideBy = entry.getKey();
         String suffix = entry.getValue();
 
-        int truncated = number / (divideBy / 10); //the number part of the output times 10
+        long truncated = longValue / (divideBy / 10); //the number part of the output times 10
         //noinspection IntegerDivisionInFloatingPointContext
         boolean hasDecimal = truncated < 100 && (truncated / 10d) != (truncated / 10);
         return hasDecimal ? (truncated / 10d) + suffix : (truncated / 10) + suffix;
@@ -380,7 +380,6 @@ public class TextUtils {
      * Calculates and returns the first formatted substring that matches the unformatted string
      * <p>
      * Used for color/style compatibility mode.
-     *
      * @param unformattedSubstring the uncolored/unstyled substring of which we request a match
      * @param formatted            the colored string, from which we request a substring
      * @return {@code null} if {@param unformattedSubstring} is not found in {@param formatted}, or the colored/styled substring.
@@ -547,5 +546,17 @@ public class TextUtils {
             }
         }
         return -1;
+    }
+
+    /**
+     * Rounds a float value for when it is being displayed as a string.
+     * <p>
+     * For example, if the given value is 123.456789 and the decimal places is 2, this will round to 1.23.
+     * @param value         The value to round
+     * @param decimalPlaces The decimal places to round to
+     * @return A string representation of the value rounded
+     */
+    public static String roundForString(float value, int decimalPlaces) {
+        return String.format("%." + decimalPlaces + "f", value);
     }
 }

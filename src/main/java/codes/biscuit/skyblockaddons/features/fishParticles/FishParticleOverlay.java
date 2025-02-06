@@ -1,8 +1,8 @@
 package codes.biscuit.skyblockaddons.features.fishParticles;
 
-import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.core.OverlayEffectRenderer;
+import codes.biscuit.skyblockaddons.core.feature.FeatureSetting;
 import net.minecraft.client.particle.EntityFX;
 import net.minecraft.client.renderer.GlStateManager;
 import org.lwjgl.opengl.GL11;
@@ -21,7 +21,7 @@ public class FishParticleOverlay extends OverlayEffectRenderer {
      */
     @Override
     public boolean shouldRenderOverlay() {
-         return super.shouldRenderOverlay() && SkyblockAddons.getInstance().getConfigValues().isEnabled(feature);
+         return super.shouldRenderOverlay() && feature.isEnabled();
     }
 
     /**
@@ -31,7 +31,7 @@ public class FishParticleOverlay extends OverlayEffectRenderer {
     public void setupRenderEnvironment() {
         super.setupRenderEnvironment();
         GlStateManager.depthFunc(GL11.GL_LEQUAL);
-        biggerWakeCache = SkyblockAddons.getInstance().getConfigValues().isEnabled(Feature.BIGGER_WAKE);
+        biggerWakeCache = Feature.FISHING_PARTICLE_OVERLAY.isEnabled(FeatureSetting.BIGGER_WAKE);
     }
 
     /**

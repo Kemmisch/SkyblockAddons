@@ -1,29 +1,20 @@
 {
   "bannerImageURL": null,
   "bannerLink": null,
-
-  "latestVersion": "1.8.9",
-  "latestBeta": "1.9.0-beta.12.1",
-  "videoLink": "https://github.com/Fix3dll/SkyblockAddons/commits/main",
-  "directDownload": "https://modrinth.com/mod/skyblockaddons-unofficial/versions",
-
   "updateInfo": {
-    "latestRelease": "1.8.9",
+    "latestRelease": "1.10.5",
     "releaseDownload": "https://modrinth.com/mod/skyblockaddons-unofficial/versions",
-    "releaseChangelog": "https://github.com/Fix3dll/SkyblockAddons/compare/77cae24...33cd90b",
-    "releaseShowcase": "",
-    "latestBeta": "1.9.0-beta.12.1",
+    "releaseChangelog": "https://modrinth.com/mod/skyblockaddons-unofficial/changelog",
+    "releaseNote": "Please read the changelog for 1.10.x changes.",
+    "latestBeta": "1.10.0-beta.4",
     "betaDownload": "https://modrinth.com/mod/skyblockaddons-unofficial/versions",
-    "betaChangelog": "https://github.com/Fix3dll/SkyblockAddons/commits/main",
-    "betaShowcase": ""
+    "betaChangelog": "https://modrinth.com/mod/skyblockaddons-unofficial/changelog",
+    "betaNote": ""
   },
-
   "languageJSONFormat": "https://raw.githubusercontent.com/Fix3dll/SkyblockAddons/main/src/main/resources/lang/%s.json",
-
   "disabledFeatures": {
-    "all": [2, 12, 16, 30, 31, 32, 35, 41, 44, 47, 51, 56, 59, 86, 89, 151, 154, 159]
+    "all": []
   },
-
   "dropSettings": {
     "minimumInventoryRarity": "RARE",
     "minimumHotbarRarity": "RARE",
@@ -115,10 +106,10 @@
       "FLAWED_PERIDOT_GEM",
       "FINE_PERIDOT_GEM",
       "FLAWLESS_PERIDOT_GEM",
-      "PERFECT_PERIDOT_GEM"
+      "PERFECT_PERIDOT_GEM",
+      "PREMIUM_FLESH"
     ]
   },
-
   "hypixelBrands": [
     ".*Hypixel BungeeCord.*"
   ]

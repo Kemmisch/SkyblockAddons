@@ -1,12 +1,13 @@
 package codes.biscuit.skyblockaddons.features.dungeonmap;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.SkyblockKeyBinding;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.core.chroma.ManualChromaManager;
-import codes.biscuit.skyblockaddons.core.dungeons.DungeonPlayer;
-import codes.biscuit.skyblockaddons.gui.buttons.ButtonLocation;
+import codes.biscuit.skyblockaddons.core.feature.FeatureSetting;
+import codes.biscuit.skyblockaddons.features.dungeon.DungeonPlayer;
+import codes.biscuit.skyblockaddons.gui.buttons.feature.ButtonLocation;
 import codes.biscuit.skyblockaddons.utils.DrawUtils;
-import codes.biscuit.skyblockaddons.utils.MathUtils;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
@@ -106,8 +107,8 @@ public class DungeonMapManager {
             }
         }
 
-        float x = main.getConfigValues().getActualX(Feature.DUNGEONS_MAP_DISPLAY);
-        float y = main.getConfigValues().getActualY(Feature.DUNGEONS_MAP_DISPLAY);
+        float x = main.getConfigValuesManager().getActualX(Feature.DUNGEONS_MAP_DISPLAY);
+        float y = main.getConfigValuesManager().getActualY(Feature.DUNGEONS_MAP_DISPLAY);
 
         GlStateManager.pushMatrix();
 
@@ -119,21 +120,26 @@ public class DungeonMapManager {
         int minecraftScale = new ScaledResolution(mc).getScaleFactor();
         GL11.glEnable(GL11.GL_SCISSOR_TEST);
         // Scissor is in screen coordinates...
-        GL11.glScissor(Math.round((x - size / 2f * scale) * minecraftScale),
-                mc.displayHeight - Math.round((y + size / 2F * scale) * minecraftScale), Math.round(size * minecraftScale * scale), Math.round(size * minecraftScale * scale));
+        GL11.glScissor(
+                Math.round((x - size / 2f * scale) * minecraftScale),
+                mc.displayHeight - Math.round((y + size / 2F * scale) * minecraftScale),
+                Math.round(size * minecraftScale * scale),
+                Math.round(size * minecraftScale * scale)
+        );
 
-        x = main.getRenderListener().transformXY(x, size, scale);
-        y = main.getRenderListener().transformXY(y, size, scale);
+        x = transformXY(x, size, scale);
+        y = transformXY(y, size, scale);
 
         if (buttonLocation != null) {
             buttonLocation.checkHoveredAndDrawBox(x, x + size, y, y + size, scale);
         }
+        Feature feature = Feature.DUNGEONS_MAP_DISPLAY;
 
         GL11.glDisable(GL11.GL_SCISSOR_TEST);
-        int color = main.getConfigValues().getColor(Feature.DUNGEONS_MAP_DISPLAY);
+        int color = feature.getColor();
         DrawUtils.drawRectAbsolute(x, y, x + size, y + size, 0x55000000);
-        ManualChromaManager.renderingText(Feature.DUNGEONS_MAP_DISPLAY);
-        DrawUtils.drawRectOutline(x, y, size, size, 1, color, main.getConfigValues().getChromaFeatures().contains(Feature.DUNGEONS_MAP_DISPLAY));
+        ManualChromaManager.renderingText(feature);
+        DrawUtils.drawRectOutline(x, y, size, size, 1, color, feature.isChroma());
         ManualChromaManager.doneRenderingText();
         GlStateManager.color(1, 1, 1, 1);
         GL11.glEnable(GL11.GL_SCISSOR_TEST);
@@ -142,7 +148,7 @@ public class DungeonMapManager {
 
         GlStateManager.color(1, 1, 1, 1);
 
-        float zoomScaleFactor = MathUtils.denormalizeSliderValue(main.getConfigValues().getMapZoom().getValue(), 0.5F, 5, 0.1F);
+        float zoomScaleFactor = getMapZoom();
         if (isScoreSummary) {
             zoomScaleFactor = 1;
         }
@@ -162,8 +168,8 @@ public class DungeonMapManager {
         float centerOffset = -((mapSize - size) / zoomScaleFactor);
         GlStateManager.translate(centerOffset, centerOffset, 0);
 
-        boolean rotate = main.getConfigValues().isEnabled(Feature.ROTATE_MAP);
-        boolean rotateOnPlayer = main.getConfigValues().isEnabled(Feature.CENTER_ROTATION_ON_PLAYER);
+        boolean rotate = feature.isEnabled(FeatureSetting.ROTATE_MAP);
+        boolean rotateOnPlayer = feature.isEnabled(FeatureSetting.CENTER_ROTATION_ON_PLAYER);
 
         if (isScoreSummary) {
             rotate = false;
@@ -375,7 +381,7 @@ public class DungeonMapManager {
             float f4 = (float)(iconType / 4 + 1) / 4.0F;
 
             NetworkPlayerInfo markerNetworkPlayerInfo = null;
-            if (main.getConfigValues().isEnabled(Feature.SHOW_PLAYER_HEADS_ON_MAP) && mapMarker.getPlayerName() != null) {
+            if (Feature.DUNGEONS_MAP_DISPLAY.isEnabled(FeatureSetting.SHOW_PLAYER_HEADS_ON_MAP) && mapMarker.getPlayerName() != null) {
                 for (NetworkPlayerInfo networkPlayerInfo : mc.getNetHandler().getPlayerInfoMap()) {
                     if (mapMarker.getPlayerName().equals(networkPlayerInfo.getGameProfile().getName())) {
                         markerNetworkPlayerInfo = networkPlayerInfo;
@@ -390,8 +396,7 @@ public class DungeonMapManager {
 
                 GlStateManager.color(1, 1, 1, 1);
 
-                if (main.getConfigValues().isEnabled(Feature.SHOW_CRITICAL_DUNGEONS_TEAMMATES) &&
-                        teammates.containsKey(mapMarker.getPlayerName())) {
+                if (Feature.SHOW_CRITICAL_DUNGEONS_TEAMMATES.isEnabled() && teammates.containsKey(mapMarker.getPlayerName())) {
                     DungeonPlayer dungeonPlayer = teammates.get(mapMarker.getPlayerName());
                     if (dungeonPlayer.isLow()) {
                         GlStateManager.color(1, 1, 0.5F, 1);
@@ -494,48 +499,54 @@ public class DungeonMapManager {
     }
 
     /**
-     * Increases the zoom level of the dungeon map by 0.5.
+     * Increases the zoom level of the dungeon map by 0.1
      */
     public static void increaseZoomByStep() {
-        setDenormalizedMapZoom(getDenormalizedMapZoom() + 0.5F);
+        setMapZoom(getMapZoom() + 0.1F);
     }
 
     /**
-     * Decreases the zoom level of the dungeon map by 0.5.
+     * Decreases the zoom level of the dungeon map by 0.1
      */
     public static void decreaseZoomByStep() {
-        setDenormalizedMapZoom(getDenormalizedMapZoom() - 0.5F);
+        setMapZoom(getMapZoom() - 0.1F);
     }
 
     /**
-     * Returns the map zoom factor from {@code codes.biscuit.skyblockaddons.config.ConfigValues#mapZoom}.
-     *
-     * @return the map zoom factor from {@code codes.biscuit.skyblockaddons.config.ConfigValues#mapZoom}
+     * Returns Dungeon Map Zoom value.
+     * @return Returns Dungeon Map Zoom value.
      */
     public static float getMapZoom() {
-        return main.getConfigValues().getMapZoom().getValue();
+        return Feature.DUNGEONS_MAP_DISPLAY.getAsNumber(FeatureSetting.DUNGEON_MAP_ZOOM).floatValue();
     }
 
     /**
-     * Returns the denormalized map zoom factor
-     * @return he denormalized map zoom factor
-     */
-    public static float getDenormalizedMapZoom(){
-        return MathUtils.denormalizeSliderValue(getMapZoom(), MIN_ZOOM, MAX_ZOOM, 0.1F);
-    }
-
-    public static void setDenormalizedMapZoom(float value){
-        setMapZoom(MathUtils.normalizeSliderValue(value, MIN_ZOOM, MAX_ZOOM,0.1F));
-    }
-
-    /**
-     * Sets the map zoom factor in {@code codes.biscuit.skyblockaddons.config.ConfigValues#mapZoom}.
-     * The new value must be between 0.5f and 5f inclusive.
-     *
-     * @param value the new map zoom factor
+     * Saves Dungeon Map Zoom value.
+     * @param value float value of Dungeon Zoom
      */
     public static void setMapZoom(float value) {
-        main.getConfigValues().getMapZoom().setValue(value);
-        main.getConfigValues().saveConfig();
+        Feature.DUNGEONS_MAP_DISPLAY.set(
+                FeatureSetting.DUNGEON_MAP_ZOOM,
+                Math.max(Math.min(value, MAX_ZOOM), MIN_ZOOM)
+        );
+        main.getConfigValuesManager().saveConfig();
     }
+
+    public static void updateDungeonMapZoom() {
+        if (Feature.DUNGEONS_MAP_DISPLAY.isEnabled(FeatureSetting.CHANGE_DUNGEON_MAP_ZOOM_WITH_KEYBOARD)) {
+            if (SkyblockKeyBinding.DECREASE_DUNGEON_MAP_ZOOM.isPressed()) {
+                DungeonMapManager.decreaseZoomByStep();
+            } else if (SkyblockKeyBinding.INCREASE_DUNGEON_MAP_ZOOM.isPressed()) {
+                DungeonMapManager.increaseZoomByStep();
+            }
+        }
+    }
+
+    private static float transformXY(float xy, int widthHeight, float scale) {
+        float minecraftScale = new ScaledResolution(Minecraft.getMinecraft()).getScaleFactor();
+        xy -= widthHeight / 2F * scale;
+        xy = Math.round(xy * minecraftScale) / minecraftScale;
+        return xy / scale;
+    }
+
 }

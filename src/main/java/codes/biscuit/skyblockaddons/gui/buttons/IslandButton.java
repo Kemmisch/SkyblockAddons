@@ -1,21 +1,20 @@
 package codes.biscuit.skyblockaddons.gui.buttons;
 
-import codes.biscuit.skyblockaddons.gui.IslandWarpGui;
+import codes.biscuit.skyblockaddons.gui.screens.IslandWarpGui;
 import codes.biscuit.skyblockaddons.utils.ColorCode;
 import codes.biscuit.skyblockaddons.utils.DrawUtils;
 import codes.biscuit.skyblockaddons.utils.objects.Pair;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.renderer.GlStateManager;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class IslandButton extends GuiButton {
+public class IslandButton extends SkyblockAddonsButton {
 
-    @Getter private List<IslandMarkerButton> markerButtons = new ArrayList<>();
+    @Getter private final List<IslandMarkerButton> markerButtons = new ArrayList<>();
 
     @Setter
     private boolean disableHover = false;
@@ -34,6 +33,11 @@ public class IslandButton extends GuiButton {
 
         for (IslandWarpGui.Marker marker : IslandWarpGui.Marker.values()) {
             if (marker.getIsland() == island) {
+                if (marker == IslandWarpGui.Marker.CARNIVAL) {
+                    if (!main.getElectionData().isPerkActive("Chivalrous Carnival")) {
+                        continue;
+                    }
+                }
                 this.markerButtons.add(new IslandMarkerButton(marker));
             }
         }
@@ -46,8 +50,8 @@ public class IslandButton extends GuiButton {
 
     public void drawButton(Minecraft mc, int mouseX, int mouseY, boolean actuallyDraw) {
         Pair<Integer, Integer> scaledMouseLocations = IslandWarpGui.getScaledMouseLocation(mouseX, mouseY);
-        mouseX = scaledMouseLocations.getKey();
-        mouseY = scaledMouseLocations.getValue();
+        mouseX = scaledMouseLocations.getLeft();
+        mouseY = scaledMouseLocations.getRight();
 
         float x = island.getX();
         float y = island.getY();
@@ -94,9 +98,8 @@ public class IslandButton extends GuiButton {
                     if (alpha != 0) {
                         hovered = true;
                     }
-                } catch (IndexOutOfBoundsException ex) {
-                    // Can't find pixel, its okay just leave it grey.
-                }
+                } catch (IndexOutOfBoundsException ignored) {} // Can't find pixel, it's okay just leave it grey.
+
             } else {
                 hovered = true;
             }
@@ -104,7 +107,6 @@ public class IslandButton extends GuiButton {
 
         if (disableHover) {
             disableHover = false;
-
             hovered = false;
         }
 

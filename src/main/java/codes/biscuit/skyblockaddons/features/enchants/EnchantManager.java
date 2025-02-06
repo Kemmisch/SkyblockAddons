@@ -1,14 +1,16 @@
 package codes.biscuit.skyblockaddons.features.enchants;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.config.ConfigValues;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.core.InventoryType;
 import codes.biscuit.skyblockaddons.core.Translations;
+import codes.biscuit.skyblockaddons.core.feature.FeatureSetting;
 import codes.biscuit.skyblockaddons.utils.ColorCode;
 import codes.biscuit.skyblockaddons.utils.ItemUtils;
 import codes.biscuit.skyblockaddons.utils.RomanNumeralParser;
 import codes.biscuit.skyblockaddons.utils.TextUtils;
+import codes.biscuit.skyblockaddons.utils.data.skyblockdata.EnchantmentsData;
+import codes.biscuit.skyblockaddons.utils.objects.RegistrableEnum;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -19,11 +21,11 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.common.util.Constants;
 import org.lwjgl.input.Mouse;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static codes.biscuit.skyblockaddons.utils.TextUtils.NUMBER_FORMAT;
 
 public class EnchantManager {
 
@@ -31,46 +33,17 @@ public class EnchantManager {
     private static final Pattern ENCHANTMENT_PATTERN = Pattern.compile("(?<enchant>[A-Za-z][A-Za-z -]+) (?<levelNumeral>[IVXLCDM]+)(?=, |$| [\\d,]+$)");
     private static final Pattern GREY_ENCHANT_PATTERN = Pattern.compile("^(Respiration|Aqua Affinity|Depth Strider|Efficiency).*");
     private static final String COMMA = ", ";
-    @Setter
-    private static Enchants enchants = new Enchants();
+    @Setter private static EnchantmentsData enchants = new EnchantmentsData();
 
     private static final Cache loreCache = new Cache();
 
-    public static class Enchants {
-        HashMap<String, Enchant.Normal> NORMAL = new HashMap<>();
-        HashMap<String, Enchant.Ultimate> ULTIMATE = new HashMap<>();
-        HashMap<String, Enchant.Stacking> STACKING = new HashMap<>();
-
-        public Enchant getFromLore(String loreName) {
-            loreName = loreName.toLowerCase(Locale.US);
-            Enchant enchant = NORMAL.get(loreName);
-            if (enchant == null) {
-                enchant = ULTIMATE.get(loreName);
-            }
-            if (enchant == null) {
-                enchant = STACKING.get(loreName);
-            }
-            if (enchant == null) {
-                enchant = new Enchant.Dummy(loreName);
-            }
-            return enchant;
-        }
-
-        public String toString() {
-            return "NORMAL:\n" + NORMAL.toString() + "\nULTIMATE:\n" + ULTIMATE.toString() + "\nSTACKING:\n" + STACKING.toString();
-        }
-    }
-
-
     /**
      * Parse through enchantments, update the item's nbt, and cache the result for future queries
-     *
      * @param loreList the current item lore (which may be processed by enchants)
      * @param item
      */
     public static void parseEnchants(List<String> loreList, ItemStack item) {
-        NBTTagCompound extraAttributes = ItemUtils.getExtraAttributes(item);
-        NBTTagCompound enchantNBT = extraAttributes == null ? null : extraAttributes.getCompoundTag("enchantments");
+        NBTTagCompound enchantNBT = ItemUtils.getEnchantments(item);
         if (enchantNBT == null && SkyblockAddons.getInstance().getInventoryUtils().getInventoryType() != InventoryType.SUPERPAIRS) {
             return;
         }
@@ -82,21 +55,21 @@ public class EnchantManager {
         }
         // Update the cache so we have something to which to compare later
         loreCache.updateBefore(loreList);
-        ConfigValues config = SkyblockAddons.getInstance().getConfigValues();
 
+        Feature feature = Feature.ENCHANTMENT_LORE_PARSING;
         FontRenderer fontRenderer = Minecraft.getMinecraft().fontRendererObj;
         int startEnchant = -1, endEnchant = -1, maxTooltipWidth = 0;
         int indexOfLastGreyEnchant = accountForAndRemoveGreyEnchants(loreList, item);
         for (int i = indexOfLastGreyEnchant == -1 ? 0 : indexOfLastGreyEnchant + 1; i < loreList.size(); i++) {
-            String u = loreList.get(i);
-            String s = TextUtils.stripColor(u);
+            String line = loreList.get(i);
+            String stripedLine = TextUtils.stripColor(line);
             if (startEnchant == -1) {
-                if (containsEnchantment(extraAttributes, s)) {
+                if (containsEnchantment(item, stripedLine)) {
                     startEnchant = i;
                 }
             }
             // Assume enchants end with an empty line "break"
-            else if (s.trim().isEmpty() && endEnchant == -1) {
+            else if (stripedLine.trim().isEmpty() && endEnchant == -1) {
                 endEnchant = i - 1;
             }
             // Get max tooltip size, disregarding the enchants section
@@ -124,16 +97,16 @@ public class EnchantManager {
             boolean containsEnchant = false;
             while (m.find()) {
                 // Pull out the enchantment and the enchantment level from lore
-                Enchant enchant = enchants.getFromLore(m.group("enchant"));
+                EnchantmentsData.Enchant enchant = enchants.getFromLore(m.group("enchant"));
                 int level = RomanNumeralParser.parseNumeral(m.group("levelNumeral"));
                 if (enchant != null) {
                     // Get the original (input) formatting code of the enchantment, which may have been affected by other mods
                     String inputFormatEnchant = "null";
-                    if (config.isDisabled(Feature.ENCHANTMENTS_HIGHLIGHT)) {
-                        inputFormatEnchant = getInputEnchantFormat(loreList.get(i), m.group());
+                    if (feature.isDisabled(FeatureSetting.HIGHLIGHT_ENCHANTMENTS)) {
+                        inputFormatEnchant = TextUtils.getFormattedString(loreList.get(i), m.group());
                     }
                     lastEnchant = new FormattedEnchant(enchant, level, inputFormatEnchant);
-                    // Try to add the enchant to the list, otherwise find the same enchant that was already present in the list
+                    // Try to add enchant to the list, otherwise find the same enchant that was already present in the list
                     if (!orderedEnchants.add(lastEnchant)) {
                         for (FormattedEnchant e : orderedEnchants) {
                             if (e.compareTo(lastEnchant) == 0) {
@@ -158,7 +131,6 @@ public class EnchantManager {
             maxTooltipWidth = Math.max(enchant.getRenderLength(), maxTooltipWidth);
         }
 
-
         if (orderedEnchants.isEmpty()) {
             loreCache.updateAfter(loreList);
             return;
@@ -167,13 +139,13 @@ public class EnchantManager {
         loreList.subList(startEnchant, endEnchant + 1).clear();
 
         List<String> insertEnchants;
-        EnchantListLayout layout = config.getEnchantLayout();
+        RegistrableEnum layout = feature.getAsEnum(FeatureSetting.ENCHANT_LAYOUT);
         // Pack as many enchantments as we can into one line (while not overstuffing it)
-        if (layout == EnchantListLayout.COMPRESS && numEnchants != 1) {
+        if (layout == EnchantLayout.COMPRESS && numEnchants != 1) {
             insertEnchants = new ArrayList<>();
 
             // Get format for comma
-            String comma = SkyblockAddons.getInstance().getConfigValues().getRestrictedColor(Feature.ENCHANTMENT_COMMA_COLOR) + COMMA;
+            String comma = feature.getAsEnum(FeatureSetting.COMMA_ENCHANT_COLOR) + COMMA;
             int commaLength = fontRenderer.getStringWidth(comma);
 
             // Process each line of enchants
@@ -198,12 +170,12 @@ public class EnchantManager {
             }
         }
         // Print 2 enchants per line, separated by a comma, with no enchant lore (typical hypixel behavior)
-        else if (layout == EnchantListLayout.NORMAL && !hasLore) {
+        else if (layout == EnchantLayout.NORMAL && !hasLore) {
             insertEnchants = new ArrayList<>();
 
             String comma;
-            if (config.isEnabled(Feature.ENCHANTMENTS_HIGHLIGHT)) {
-                comma = SkyblockAddons.getInstance().getConfigValues().getRestrictedColor(Feature.ENCHANTMENT_COMMA_COLOR) + COMMA;
+            if (feature.isEnabled(FeatureSetting.HIGHLIGHT_ENCHANTMENTS)) {
+                comma = feature.getAsEnum(FeatureSetting.COMMA_ENCHANT_COLOR) + COMMA;
             } else {
                 comma = COMMA;
             }
@@ -211,7 +183,7 @@ public class EnchantManager {
             int i = 0;
             StringBuilder builder = new StringBuilder(maxTooltipWidth);
             for (FormattedEnchant enchant : orderedEnchants) {
-                // Add the enchant
+                // Add enchant
                 builder.append(enchant.getFormattedString());
                 // Add a comma for the first on the row, followed by a comma
                 if (i % 2 == 0) {
@@ -233,7 +205,7 @@ public class EnchantManager {
         // Prints each enchantment out on a separate line. Also adds the lore if need be
         else {
             // Add each enchantment (one per line) + add enchant lore (if available)
-            if (config.isDisabled(Feature.HIDE_ENCHANT_DESCRIPTION)) {
+            if (feature.isDisabled(FeatureSetting.HIDE_ENCHANTMENT_LORE)) {
                 insertEnchants = new ArrayList<>((hasLore ? 3 : 1) * numEnchants);
                 for (FormattedEnchant enchant : orderedEnchants) {
                     // Add the enchant
@@ -266,15 +238,15 @@ public class EnchantManager {
      * @return the index after the point at which we inserted new lines, or {@param insertAt} if we didn't insert anything.
      */
     public static int insertStackingEnchantProgress(List<String> loreList, NBTTagCompound extraAttributes, int insertAt) {
-        if (extraAttributes == null || SkyblockAddons.getInstance().getConfigValues().isDisabled(Feature.SHOW_STACKING_ENCHANT_PROGRESS)) {
+        if (extraAttributes == null || Feature.SHOW_STACKING_ENCHANT_PROGRESS.isDisabled()) {
             return insertAt;
         }
-        for (Enchant.Stacking enchant : enchants.STACKING.values()) {
-            if (extraAttributes.hasKey(enchant.nbtNum, Constants.NBT.TAG_ANY_NUMERIC)) {
-                int stackedEnchantNum = extraAttributes.getInteger(enchant.nbtNum);
-                Integer nextLevel = enchant.stackLevel.higher(stackedEnchantNum);
-                String statLabel = Translations.getMessage("enchants." + enchant.statLabel);
-                ColorCode colorCode = SkyblockAddons.getInstance().getConfigValues().getRestrictedColor(Feature.SHOW_STACKING_ENCHANT_PROGRESS);
+        for (EnchantmentsData.Enchant.Stacking enchant : enchants.getStacking().values()) {
+            if (extraAttributes.hasKey(enchant.getNbtNum(), Constants.NBT.TAG_ANY_NUMERIC)) {
+                long stackedEnchantNum = extraAttributes.getLong(enchant.getNbtNum());
+                Long nextLevel = enchant.getStackLevel().higher(stackedEnchantNum);
+                String statLabel = Translations.getMessage("enchants." + enchant.getStatLabel());
+                ColorCode colorCode = Feature.SHOW_STACKING_ENCHANT_PROGRESS.getRestrictedColor();
                 StringBuilder b = new StringBuilder();
                 b.append("§7").append(statLabel).append(": ").append(colorCode);
                 if (nextLevel == null) {
@@ -282,7 +254,7 @@ public class EnchantManager {
                     b.append(TextUtils.abbreviate(stackedEnchantNum)).append(" §7(").append(Translations.getMessage("enchants.maxed")).append(")");
                 } else {
                     // §7Expertise Kills: §a500 §7/ 1k
-                    String format = NUMBER_FORMAT.format(stackedEnchantNum);
+                    String format = TextUtils.formatNumber(stackedEnchantNum);
                     b.append(format).append(" §7/ ").append(TextUtils.abbreviate(nextLevel));
                 }
                 loreList.add(insertAt++, b.toString());
@@ -294,144 +266,29 @@ public class EnchantManager {
     /**
      * Helper method to determine whether we should skip this line in parsing the lore.
      * E.g. we want to skip "Breaking Power X" seen on pickaxes.
-     *
-     * @param eaNBT the extraAttributes NBT of the item
-     * @param s          the line of lore we are parsing
+     * @param itemStack ItemStack
+     * @param stripedLine the line of lore we are parsing
      * @return {@code true} if no enchants on the line are in the enchants table, {@code false} otherwise.
      */
-    public static boolean containsEnchantment(NBTTagCompound eaNBT, String s) {
-        NBTTagCompound enchantNBT = eaNBT == null ? null : eaNBT.getCompoundTag("enchantments");
-        Matcher m = ENCHANTMENT_PATTERN.matcher(s);
+    public static boolean containsEnchantment(ItemStack itemStack, String stripedLine) {
+        NBTTagCompound enchantNBT = ItemUtils.getEnchantments(itemStack);
+        NBTTagCompound attributesNBT = ItemUtils.getAttributes(itemStack);
+
+        Matcher m = ENCHANTMENT_PATTERN.matcher(stripedLine);
         while (m.find()) {
-            Enchant enchant = enchants.getFromLore(m.group("enchant"));
-            if (enchantNBT == null || enchantNBT.hasKey(enchant.nbtName)) {
-                NBTTagCompound attributesNBT = eaNBT == null ? null : eaNBT.getCompoundTag("attributes");
-                if (attributesNBT == null || !attributesNBT.hasKey(enchant.nbtName))
+            EnchantmentsData.Enchant enchant = enchants.getFromLore(m.group("enchant"));
+            if (enchantNBT == null || enchantNBT.hasKey(enchant.getNbtName())) {
+                if (attributesNBT == null || !attributesNBT.hasKey(enchant.getNbtName())) {
                     return true;
+                }
             }
         }
         return false;
     }
 
     /**
-     * Calculates and returns the format of the unformatted enchant in the formatted enchants line
-     * <p>
-     * Used for color/style compatibility mode.
-     *
-     * @param formattedEnchants  the colored/styled line of lore with enchants
-     * @param unformattedEnchant the uncolored/unstyled enchant name
-     * @return {@code null} if {@param unformattedEnchant} is not found in {@param formattedEnchants}, or the colored/styled enchant substring.
-     */
-    private static String getInputEnchantFormat(String formattedEnchants, String unformattedEnchant) {
-        if (unformattedEnchant.isEmpty()) {
-            return "";
-        }
-        String styles = "kKlLmMnNoO";
-        StringBuilder preEnchantFormat = new StringBuilder();
-        StringBuilder formattedEnchant = new StringBuilder();
-
-        int i = -2;
-        int len = formattedEnchants.length();
-        int unformattedEnchantIdx = 0;
-        int k = 0;
-        while (true) {
-            i = formattedEnchants.indexOf('§', i + 2);
-            // No more formatting codes were found in the string
-            if (i == -1) {
-                // Test if there is an instance of the formatted enchant in the rest of the string
-                for (; k < len; k++) {
-                    // Enchant string matches at position k
-                    if (formattedEnchants.charAt(k) == unformattedEnchant.charAt(unformattedEnchantIdx)) {
-                        formattedEnchant.append(formattedEnchants.charAt(k));
-                        unformattedEnchantIdx++;
-                        // We have matched the entire enchant. Return the current format + the formatted enchant
-                        if (unformattedEnchantIdx == unformattedEnchant.length()) {
-                            return preEnchantFormat.append(formattedEnchant).toString();
-                        }
-                    }
-                    // Enchant string doesn't match at position k
-                    else {
-                        unformattedEnchantIdx = 0;
-                        // Transfer formats from formatted enchant to format
-                        preEnchantFormat = new StringBuilder(mergeFormats(preEnchantFormat.toString(), formattedEnchant.toString()));
-                        formattedEnchant = new StringBuilder();
-                    }
-                }
-                // No matching enchant found
-                return null;
-            } else {
-                for (; k < i; k++) {
-                    if (formattedEnchants.charAt(k) == unformattedEnchant.charAt(unformattedEnchantIdx)) {
-                        formattedEnchant.append(formattedEnchants.charAt(k));
-                        unformattedEnchantIdx++;
-                        // We have matched the entire enchant. Return the current format + the formatted enchant
-                        if (unformattedEnchantIdx == unformattedEnchant.length()) {
-                            return preEnchantFormat.append(formattedEnchant).toString();
-                        }
-                    } else {
-                        unformattedEnchantIdx = 0;
-                        // Transfer formats from formatted enchant to format
-                        preEnchantFormat = new StringBuilder(mergeFormats(preEnchantFormat.toString(), formattedEnchant.toString()));
-                        formattedEnchant = new StringBuilder();
-                    }
-                }
-                // Add the format code if present
-                if (i + 1 < len) {
-                    char formatChar = formattedEnchants.charAt(i + 1);
-                    // If not parsing an enchant, alter the pre enchant format
-                    if (unformattedEnchantIdx == 0) {
-                        // Restart format at a new color
-                        if (styles.indexOf(formatChar) == -1) {
-                            preEnchantFormat = new StringBuilder();
-                        }
-                        // Append the new format code to the formatter
-                        preEnchantFormat.append("§").append(formatChar);
-                    }
-                    // If parsing an enchant, alter the current enchant format and the formatted enchant
-                    else {
-                        // Restart format at a new color
-                        formattedEnchant.append("§").append(formatChar);
-                    }
-                    // Skip the formatting code "§[0-9a-zA-Z]" on the next round
-                    k = i + 2;
-                }
-            }
-        }
-    }
-
-    /**
-     * Calculate the color/style formatting after first and second format strings
-     * <p>
-     * Used for: Given the color/style formatting before an enchantment. as well as the enchantment itself,
-     * Calculate the color/style formatting after the enchantment
-     *
-     * @param firstFormat  the color/style formatting before the string
-     * @param secondFormat the string that may have formatting codes within it
-     * @return the relevant formatting codes in effect after {@param secondFormat}
-     */
-    private static String mergeFormats(String firstFormat, String secondFormat) {
-        if (secondFormat == null || secondFormat.isEmpty()) {
-            return firstFormat;
-        }
-        String styles = "kKlLmMnNoO";
-        StringBuilder builder = new StringBuilder(firstFormat);
-        int i = -2;
-        while ((i = secondFormat.indexOf('§', i + 2)) != -1) {
-            if (i + 1 < secondFormat.length()) {
-                char c = secondFormat.charAt(i + 1);
-                // If it's not a style then it's a color code
-                if (styles.indexOf(c) == -1) {
-                    builder = new StringBuilder();
-                }
-                builder.append("§").append(c);
-            }
-        }
-        return builder.toString();
-    }
-
-    /**
      * Counts (and optionally removes) vanilla grey enchants that are added on the first 1-2 lines of lore.
-     * Removal of the grey enchants is specified by the {@link Feature#HIDE_GREY_ENCHANTS} feature.
+     * Removal of the grey enchants is specified by the {@link FeatureSetting#HIDE_GREY_ENCHANTS} feature.
      *
      * @param tooltip the tooltip being built
      * @param item    to which the tooltip corresponds
@@ -443,7 +300,7 @@ public class EnchantManager {
             return -1;
         }
         int lastGreyEnchant = -1;
-        boolean removeGreyEnchants = SkyblockAddons.getInstance().getConfigValues().isEnabled(Feature.HIDE_GREY_ENCHANTS);
+        boolean removeGreyEnchants = Feature.ENCHANTMENT_LORE_PARSING.isEnabled(FeatureSetting.HIDE_GREY_ENCHANTS);
 
         // Start at index 1 since index 0 is the title
         int total = 0;
@@ -461,7 +318,6 @@ public class EnchantManager {
         }
         return removeGreyEnchants ? -1 : lastGreyEnchant;
     }
-
 
     private static int correctTooltipWidth(int maxTooltipWidth) {
         // Figure out whether the item tooltip is gonna wrap, and if so, try to make our enchantments wrap
@@ -485,104 +341,6 @@ public class EnchantManager {
         return maxTooltipWidth;
     }
 
-    static class Enchant implements Comparable<Enchant> {
-        String nbtName;
-        String loreName;
-        int goodLevel;
-        int maxLevel;
-
-        public boolean isNormal() {
-            return this instanceof Normal;
-        }
-
-        public boolean isUltimate() {
-            return this instanceof Ultimate;
-        }
-
-        public boolean isStacking() {
-            return this instanceof Stacking;
-        }
-
-        public String getFormattedName(int level) {
-            return getFormat(level) + loreName;
-        }
-
-        public String getUnformattedName() {
-            return loreName;
-        }
-
-        public String getFormat(int level) {
-            ConfigValues config = SkyblockAddons.getInstance().getConfigValues();
-            if (level >= maxLevel) {
-                return config.getRestrictedColor(Feature.ENCHANTMENT_PERFECT_COLOR).toString();
-            }
-            if (level > goodLevel) {
-                return config.getRestrictedColor(Feature.ENCHANTMENT_GREAT_COLOR).toString();
-            }
-            if (level == goodLevel) {
-                return config.getRestrictedColor(Feature.ENCHANTMENT_GOOD_COLOR).toString();
-            }
-            return config.getRestrictedColor(Feature.ENCHANTMENT_POOR_COLOR).toString();
-        }
-
-        public String toString() {
-            return nbtName + " " + goodLevel + " " + maxLevel + "\n";
-        }
-
-
-        /**
-         * Orders enchants by type in the following way:
-         * 1) Ultimates (alphabetically)
-         * 2) Stacking (alphabetically)
-         * 3) Normal (alphabetically)
-         */
-        @Override
-        public int compareTo(Enchant o) {
-            if (this.isUltimate() == o.isUltimate()) {
-                if (this.isStacking() == o.isStacking()) {
-                    return this.loreName.compareTo(o.loreName);
-                }
-                return this.isStacking() ? -1 : 1;
-            }
-            return this.isUltimate() ? -1 : 1;
-        }
-
-
-        static class Normal extends Enchant {
-        }
-
-        static class Ultimate extends Enchant {
-            @Override
-            public String getFormat(int level) {
-                return "§d§l";
-            }
-        }
-
-        static class Stacking extends Enchant {
-            String nbtNum;
-            String statLabel;
-            TreeSet<Integer> stackLevel;
-
-            public String toString() {
-                return nbtNum + " " + stackLevel.toString() + " " + super.toString();
-            }
-        }
-
-        static class Dummy extends Enchant {
-
-            public Dummy(String name) {
-                loreName = name;
-                nbtName = name.toLowerCase().replaceAll(" ", "_");
-            }
-
-            @Override
-            public String getFormat(int level) {
-                return ColorCode.DARK_RED.toString();
-            }
-        }
-    }
-
-
     public static void markCacheDirty() {
         loreCache.configChanged = true;
     }
@@ -595,7 +353,6 @@ public class EnchantManager {
         private List<String> cachedBefore = new ArrayList<>();
 
         public Cache() {
-
         }
 
         public void updateBefore(List<String> loreBeforeModifications) {
@@ -621,13 +378,13 @@ public class EnchantManager {
     }
 
     static class FormattedEnchant implements Comparable<FormattedEnchant> {
-        Enchant enchant;
+        EnchantmentsData.Enchant enchant;
         int level;
         List<String> loreDescription;
         String inputFormattedString;
 
 
-        public FormattedEnchant(Enchant theEnchant, int theLevel, String theFormattedEnchant) {
+        public FormattedEnchant(EnchantmentsData.Enchant theEnchant, int theLevel, String theFormattedEnchant) {
             enchant = theEnchant;
             level = theLevel;
             inputFormattedString = theFormattedEnchant;
@@ -647,21 +404,19 @@ public class EnchantManager {
             return this.enchant.compareTo(o.enchant);
         }
 
-
         public int getRenderLength() {
             return Minecraft.getMinecraft().fontRendererObj.getStringWidth(getFormattedString());
         }
 
         public String getFormattedString() {
-            ConfigValues config = SkyblockAddons.getInstance().getConfigValues();
             StringBuilder b = new StringBuilder();
-            if (config.isEnabled(Feature.ENCHANTMENTS_HIGHLIGHT)) {
+            if (Feature.ENCHANTMENT_LORE_PARSING.isEnabled(FeatureSetting.HIGHLIGHT_ENCHANTMENTS)) {
                 b.append(enchant.getFormattedName(level));
             } else {
                 return inputFormattedString;
             }
             b.append(" ");
-            if (config.isEnabled(Feature.REPLACE_ROMAN_NUMERALS_WITH_NUMBERS)) {
+            if (Feature.REPLACE_ROMAN_NUMERALS_WITH_NUMBERS.isEnabled()) {
                 b.append(level);
             } else {
                 b.append(RomanNumeralParser.integerToRoman(level));

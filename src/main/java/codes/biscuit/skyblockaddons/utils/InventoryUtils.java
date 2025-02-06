@@ -1,12 +1,17 @@
 package codes.biscuit.skyblockaddons.utils;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.Island;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.core.InventoryType;
-import codes.biscuit.skyblockaddons.features.ItemDiff;
-import codes.biscuit.skyblockaddons.features.SlayerArmorProgress;
+import codes.biscuit.skyblockaddons.core.ItemDiff;
+import codes.biscuit.skyblockaddons.core.SlayerArmorProgress;
+import codes.biscuit.skyblockaddons.core.ThunderBottle;
+import codes.biscuit.skyblockaddons.core.feature.FeatureSetting;
 import codes.biscuit.skyblockaddons.features.dragontracker.DragonTracker;
-import codes.biscuit.skyblockaddons.misc.scheduler.Scheduler;
+import codes.biscuit.skyblockaddons.core.scheduler.ScheduledTask;
+import codes.biscuit.skyblockaddons.utils.data.DataUtils;
+import codes.biscuit.skyblockaddons.utils.data.requests.MayorRequest;
 import codes.biscuit.skyblockaddons.utils.objects.Pair;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
@@ -18,11 +23,17 @@ import net.minecraft.client.gui.inventory.GuiChest;
 import net.minecraft.crash.CrashReport;
 import net.minecraft.crash.CrashReportCategory;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.*;
+import net.minecraft.init.Items;
+import net.minecraft.inventory.Container;
+import net.minecraft.inventory.ContainerBeacon;
+import net.minecraft.inventory.ContainerChest;
+import net.minecraft.inventory.ContainerFurnace;
+import net.minecraft.inventory.ContainerHopper;
+import net.minecraft.inventory.ContainerPlayer;
+import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ReportedException;
-import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.Logger;
 
 import java.math.BigDecimal;
@@ -37,12 +48,13 @@ import java.util.regex.Pattern;
  * Utility methods related to player inventories
  */
 public class InventoryUtils {
+    private static final SkyblockAddons main = SkyblockAddons.getInstance();
     private static final Logger logger = SkyblockAddons.getLogger();
 
     public static final HashSet<String> BAT_PERSON_SET_IDS = new HashSet<>(
             Arrays.asList("BAT_PERSON_BOOTS", "BAT_PERSON_LEGGINGS", "BAT_PERSON_CHESTPLATE", "BAT_PERSON_HELMET")
     );
-    private static final Pattern REVENANT_UPGRADE_PATTERN = Pattern.compile("Next Upgrade: \\+([0-9]+❈) \\(([0-9,]+)/([0-9,]+)\\)");
+    private static final Pattern SLAYER_ARMOR_STACK_PATTERN = Pattern.compile("Next Upgrade: \\+([0-9]+❈) \\(([0-9,]+)/([0-9,]+)\\)");
     private List<ItemStack> previousInventory;
     private final Multimap<String, ItemDiff> itemPickupLog = ArrayListMultimap.create();
 
@@ -64,37 +76,27 @@ public class InventoryUtils {
     @Getter
     private final SlayerArmorProgress[] slayerArmorProgresses = new SlayerArmorProgress[4];
 
-    @Getter
-    private ItemStack emptyThunderBottle = null;
-
-    @Getter
-    private boolean haveFullThunderBottle;
-
-    @Getter
+    @Getter @Setter
     private InventoryType inventoryType;
     @Getter
     String inventoryKey;
-    @Getter
+    @Getter @Setter
     private int inventoryPageNum;
     @Getter
     private String inventorySubtype;
-    private final SkyblockAddons main = SkyblockAddons.getInstance();
 
+    private ScheduledTask repeatWarningTask = null;
+    private boolean inQuiverMode = false;
 
     /**
      * Copies an inventory into a List of copied ItemStacks
-     *
      * @param inventory Inventory to copy
      * @return List of copied ItemStacks
      */
     private List<ItemStack> copyInventory(ItemStack[] inventory) {
         List<ItemStack> copy = new ArrayList<>(inventory.length);
         for (ItemStack item : inventory) {
-            if (item != null) {
-                copy.add(ItemStack.copyItemStack(item));
-            } else {
-                copy.add(null);
-            }
+            copy.add(ItemStack.copyItemStack(item));
         }
         return copy;
     }
@@ -102,17 +104,16 @@ public class InventoryUtils {
     /**
      * Compares previously recorded Inventory state with current Inventory state to determine changes and
      * stores them in {@link #itemPickupLog}
-     *
      * @param currentInventory Current Inventory state
      */
-    public void getInventoryDifference(ItemStack[] currentInventory) {
+    public void calculateInventoryDifference(ItemStack[] currentInventory) {
         List<ItemStack> newInventory = copyInventory(currentInventory);
-        Map<String, Pair<Integer, NBTTagCompound>> previousInventoryMap = new HashMap<>();
-        Map<String, Pair<Integer, NBTTagCompound>> newInventoryMap = new HashMap<>();
 
         if (previousInventory != null) {
+            DiffHashMap previousInventoryMap = new DiffHashMap();
+            DiffHashMap newInventoryMap = new DiffHashMap();
 
-            for(int i = 0; i < newInventory.size(); i++) {
+            for (int i = 0; i < newInventory.size(); i++) {
                 if (i == 8) { // Skip the SkyBlock Menu slot altogether (which includes the Quiver Arrow now)
                     continue;
                 }
@@ -124,36 +125,16 @@ public class InventoryUtils {
                     previousItem = previousInventory.get(i);
                     newItem = newInventory.get(i);
 
-                    if(previousItem != null) {
-                        int amount;
-                        if (previousInventoryMap.containsKey(previousItem.getDisplayName())) {
-                            amount = previousInventoryMap.get(previousItem.getDisplayName()).getKey() + previousItem.stackSize;
-                        } else {
-                            amount = previousItem.stackSize;
-                        }
-                        NBTTagCompound extraAttributes = ItemUtils.getExtraAttributes(previousItem);
-                        if (extraAttributes != null) {
-                            extraAttributes = (NBTTagCompound) extraAttributes.copy();
-                        }
-                        previousInventoryMap.put(previousItem.getDisplayName(), new Pair<>(amount, extraAttributes));
+                    if (previousItem != null) {
+                        previousInventoryMap.updateWithItem(previousItem);
                     }
 
-                    if(newItem != null) {
-                        if (newItem.getDisplayName().contains(" "+ ColorCode.DARK_GRAY+"x")) {
+                    if (newItem != null) {
+                        if (newItem.getDisplayName().contains(" " + ColorCode.DARK_GRAY + "x")) {
                             String newName = newItem.getDisplayName().substring(0, newItem.getDisplayName().lastIndexOf(" "));
                             newItem.setStackDisplayName(newName); // This is a workaround for merchants, it adds x64 or whatever to the end of the name.
                         }
-                        int amount;
-                        if (newInventoryMap.containsKey(newItem.getDisplayName())) {
-                            amount = newInventoryMap.get(newItem.getDisplayName()).getKey() + newItem.stackSize;
-                        }  else {
-                            amount = newItem.stackSize;
-                        }
-                        NBTTagCompound extraAttributes = ItemUtils.getExtraAttributes(newItem);
-                        if (extraAttributes != null) {
-                            extraAttributes = (NBTTagCompound) extraAttributes.copy();
-                        }
-                        newInventoryMap.put(newItem.getDisplayName(), new Pair<>(amount, extraAttributes));
+                        newInventoryMap.updateWithItem(newItem);
                     }
                 } catch (RuntimeException exception) {
                     CrashReport crashReport = CrashReport.makeCrashReport(exception, "Comparing current inventory to previous inventory");
@@ -162,9 +143,9 @@ public class InventoryUtils {
                     inventoryDetails.addCrashSection("New", "Size: " + newInventory.size());
                     CrashReportCategory itemDetails = crashReport.makeCategory("Item Details");
                     itemDetails.addCrashSection("Previous Item", "Item: " + (previousItem != null ? previousItem.toString() : "null") + "\n"
-                        + "Display Name: " + (previousItem != null ? previousItem.getDisplayName() : "null") + "\n"
-                        + "Index: " + i + "\n"
-                        + "Map Value: " + (previousItem != null ? (previousInventoryMap.get(previousItem.getDisplayName()) != null ? previousInventoryMap.get(previousItem.getDisplayName()).toString() : "null") : "null"));
+                            + "Display Name: " + (previousItem != null ? previousItem.getDisplayName() : "null") + "\n"
+                            + "Index: " + i + "\n"
+                            + "Map Value: " + (previousItem != null ? (previousInventoryMap.get(previousItem.getDisplayName()) != null ? previousInventoryMap.get(previousItem.getDisplayName()).toString() : "null") : "null"));
                     itemDetails.addCrashSection("New Item", "Item: " + (newItem != null ? newItem.toString() : "null") + "\n"
                             + "Display Name: " + (newItem != null ? newItem.getDisplayName() : "null") + "\n"
                             + "Index: " + i + "\n"
@@ -180,27 +161,29 @@ public class InventoryUtils {
             keySet.forEach(key -> {
                 int previousAmount = 0;
                 if (previousInventoryMap.containsKey(key)) {
-                    previousAmount = previousInventoryMap.get(key).getKey();
+                    previousAmount = previousInventoryMap.get(key).getLeft();
                 }
 
                 int newAmount = 0;
                 if (newInventoryMap.containsKey(key)) {
-                    newAmount = newInventoryMap.get(key).getKey();
+                    newAmount = newInventoryMap.get(key).getLeft();
                 }
 
                 int diff = newAmount - previousAmount;
                 if (diff != 0) { // Get the NBT tag from whichever map the name exists in
-                    inventoryDifference.add(new ItemDiff(key, diff, newInventoryMap.getOrDefault(key, previousInventoryMap.get(key)).getValue()));
+                    inventoryDifference.add(
+                            new ItemDiff(key, diff, newInventoryMap.getOrDefault(key, previousInventoryMap.get(key)).getRight())
+                    );
                 }
             });
 
-            if (main.getConfigValues().isEnabled(Feature.DRAGON_STATS_TRACKER)) {
+            if (Feature.DRAGON_STATS_TRACKER.isEnabled()) {
                 DragonTracker.getInstance().checkInventoryDifferenceForDrops(inventoryDifference);
             }
 
             // Add changes to already logged changes of the same item, so it will increase/decrease the amount
             // instead of displaying the same item twice
-            if (main.getConfigValues().isEnabled(Feature.ITEM_PICKUP_LOG)) {
+            if (Feature.ITEM_PICKUP_LOG.isEnabled()) {
                 for (ItemDiff diff : inventoryDifference) {
                     Collection<ItemDiff> itemDiffs = itemPickupLog.get(diff.getDisplayName());
                     if (itemDiffs.size() <= 0) {
@@ -220,7 +203,6 @@ public class InventoryUtils {
                     }
                 }
             }
-
         }
 
         previousInventory = newInventory;
@@ -241,41 +223,61 @@ public class InventoryUtils {
     }
 
     /**
-     * Checks if the players inventory is full and displays an alarm if so.
-     *
+     * Checks if the players inventory is full and displays an alarm if so. Slot 8 is the Skyblock menu/quiver feather
+     * slot. It's ignored so shooting with a full inventory doesn't spam the full inventory warning.
      * @param mc Minecraft instance
      * @param p Player to check
      */
     public void checkIfInventoryIsFull(Minecraft mc, EntityPlayerSP p) {
-        if (main.getUtils().isOnSkyblock() && main.getConfigValues().isEnabled(Feature.FULL_INVENTORY_WARNING)) {
-            /*
-            If the inventory is full, show the full inventory warning.
-            Slot 8 is the Skyblock menu/quiver arrow slot. It's ignored so shooting with a full inventory
-            doesn't spam the full inventory warning.
-             */
+        Feature feature = Feature.FULL_INVENTORY_WARNING;
+
+        if (main.getUtils().isOnSkyblock() && feature.isEnabled()) {
             for (int i = 0; i < p.inventory.mainInventory.length; i++) {
                 // If we find an empty slot that isn't slot 8, remove any queued warnings and stop checking.
-                if (p.inventory.mainInventory[i] == null && i != 8) {
+                ItemStack idxItem = p.inventory.mainInventory[i];
+                if (idxItem == null && i != 8) {
                     if (inventoryWarningShown) {
-                        main.getScheduler().removeQueuedFullInventoryWarnings();
+                        if (repeatWarningTask != null) {
+                            repeatWarningTask.cancel();
+                            repeatWarningTask = null;
+                        }
                     }
                     inventoryWarningShown = false;
                     return;
+                } else if (idxItem != null && i == 8 && idxItem.getItem() == Items.feather) {
+                    inQuiverMode = true;
+                    return;
                 }
             }
+            inQuiverMode = false;
 
             // If we make it here, the inventory is full. Show the warning.
-            if (mc.currentScreen == null && main.getPlayerListener().didntRecentlyJoinWorld() && !inventoryWarningShown) {
-                showFullInventoryWarning();
-                main.getScheduler().schedule(Scheduler.CommandType.RESET_TITLE_FEATURE, main.getConfigValues().getWarningSeconds());
-
-                // Schedule a repeat if needed.
-                if (main.getConfigValues().isEnabled(Feature.REPEAT_FULL_INVENTORY_WARNING)) {
-                    main.getScheduler().schedule(Scheduler.CommandType.SHOW_FULL_INVENTORY_WARNING, 10);
-                    main.getScheduler().schedule(Scheduler.CommandType.RESET_TITLE_FEATURE, 10 + main.getConfigValues().getWarningSeconds());
+            if (mc.currentScreen == null && main.getPlayerListener().didntRecentlyJoinWorld()) {
+                if (!inventoryWarningShown) {
+                    showFullInventoryWarning();
+                    inventoryWarningShown = true;
                 }
-
-                inventoryWarningShown = true;
+                // Schedule a repeat if needed.
+                if (feature.isEnabled(FeatureSetting.REPEATING_FULL_INVENTORY_WARNING) && repeatWarningTask == null) {
+                    repeatWarningTask = main.getScheduler().scheduleTask(
+                            scheduledTask -> {
+                                // Stop the task if the setting is disabled or the player is not in Skyblock
+                                if (feature.isDisabled(FeatureSetting.REPEATING_FULL_INVENTORY_WARNING)
+                                        || mc.theWorld == null || mc.thePlayer == null || !main.getUtils().isOnSkyblock()) {
+                                    scheduledTask.cancel();
+                                    repeatWarningTask = null;
+                                    return;
+                                }
+                                if (inQuiverMode) {
+                                    return;
+                                }
+                                showFullInventoryWarning();
+                            },
+                            10 * 20,
+                            10 * 20,
+                            true
+                    );
+                }
             }
         }
     }
@@ -294,8 +296,8 @@ public class InventoryUtils {
      * @param p Player to check
      */
     public void checkIfWearingSkeletonHelmet(EntityPlayerSP p) {
-        if (main.getConfigValues().isEnabled(Feature.SKELETON_BAR)) {
-            ItemStack item = p.getEquipmentInSlot(4);
+        if (Feature.SKELETON_BAR.isEnabled()) {
+            ItemStack item = p.getCurrentArmor(3);
             if (item != null && "SKELETON_HELMET".equals(ItemUtils.getSkyblockItemID(item))) {
                 wearingSkeletonHelmet = true;
                 return;
@@ -310,7 +312,7 @@ public class InventoryUtils {
      * @param p the player to check
      */
     public void checkIfUsingArrowPoison(EntityPlayerSP p) {
-        if (main.getConfigValues().isEnabled(Feature.TURN_BOW_COLOR_WHEN_USING_ARROW_POISON)) {
+        if (Feature.TURN_BOW_COLOR_WHEN_USING_ARROW_POISON.isEnabled()) {
             for (ItemStack item : p.inventory.mainInventory) {
                 if (item != null) {
                     String itemID = ItemUtils.getSkyblockItemID(item);
@@ -342,31 +344,21 @@ public class InventoryUtils {
     }
 
     /**
-     * Checks if the player has the Thunder Bottle and updates {@link #emptyThunderBottle} and {@link #haveFullThunderBottle} accordingly
+     * Checks if the player has the Thunder Bottle and updates accordingly
      * @param p EntityPlayerSP
      */
     public void checkIfThunderBottle(EntityPlayerSP p) {
-        if (main.getConfigValues().isEnabled(Feature.THUNDER_BOTTLE_DISPLAY)) {
-            if (emptyThunderBottle != null && !ArrayUtils.contains(p.inventory.mainInventory, emptyThunderBottle))
-                emptyThunderBottle = null;
+        if (Feature.THUNDER_BOTTLE_DISPLAY.isEnabled()) {
+            ThunderBottle displayBottle = ThunderBottle.getDisplayBottle();
 
-            // If there is multiple empty bottle, Hypixel applies "first-come, first-served" according to inv index
-            boolean foundFullThunderBottle = false;
-            for (ItemStack item : p.inventory.mainInventory) {
-                if (item != null) {
-                    String itemID = ItemUtils.getSkyblockItemID(item);
-                    if ("THUNDER_IN_A_BOTTLE_EMPTY".equals(itemID)) {
-                        emptyThunderBottle = item;
-                        return;
-                    } else if (emptyThunderBottle == null && "THUNDER_IN_A_BOTTLE".equals(itemID)) {
-                        haveFullThunderBottle = true;
-                        foundFullThunderBottle = true;
-                    }
-                }
+            // Check if display bottle still exist in inventory, if not clear current ThunderBottle
+            if (displayBottle != null && p.inventory.mainInventory[displayBottle.getSlot()] == null) {
+                displayBottle.setItemStack(null);
+                displayBottle.setSlot(-1);
+                displayBottle.setCharge(0);
             }
-            emptyThunderBottle = null;
-            if (!foundFullThunderBottle)
-                haveFullThunderBottle = false;
+
+            ThunderBottle.updateThunderBottles(p.inventory.mainInventory);
         }
     }
 
@@ -377,45 +369,45 @@ public class InventoryUtils {
      * @param p the player to check
      */
     public void checkIfWearingSlayerArmor(EntityPlayerSP p) {
-        if (main.getConfigValues().isEnabled(Feature.SLAYER_INDICATOR)) {
-            for (int i = 3; i >= 0; i--) {
-                ItemStack itemStack = p.inventory.armorInventory[i];
-                String itemID = itemStack != null ? ItemUtils.getSkyblockItemID(itemStack) : null;
+        if (Feature.SLAYER_ARMOR_PROGRESS.isDisabled()) return;
 
-                if (itemID != null && (itemID.startsWith("REVENANT") || itemID.startsWith("TARANTULA") ||
-                        itemID.startsWith("FINAL_DESTINATION") || itemID.startsWith("REAPER"))) {
-                    String percent = null;
-                    String defence = null;
-                    List<String> lore = ItemUtils.getItemLore(itemStack);
-                    for (String loreLine : lore) {
-                        Matcher matcher = REVENANT_UPGRADE_PATTERN.matcher(TextUtils.stripColor(loreLine));
-                        if (matcher.matches()) { // Example: line§5§o§7Next Upgrade: §a+240❈ §8(§a14,418§7/§c15,000§8)
-                            try {
-                                float percentage = Float.parseFloat(matcher.group(2).replace(",", "")) /
-                                        Integer.parseInt(matcher.group(3).replace(",", "")) * 100;
-                                BigDecimal bigDecimal = new BigDecimal(percentage).setScale(0, RoundingMode.HALF_UP);
-                                percent = bigDecimal.toString();
-                                defence = ColorCode.GREEN + matcher.group(1);
-                                break;
-                            } catch (NumberFormatException ignored) {
-                            }
+        for (int i = 3; i >= 0; i--) {
+            ItemStack itemStack = p.inventory.armorInventory[i];
+            String itemID = itemStack != null ? ItemUtils.getSkyblockItemID(itemStack) : null;
+
+            if (itemID != null && (itemID.startsWith("REVENANT") || itemID.startsWith("TARANTULA") ||
+                    itemID.startsWith("FINAL_DESTINATION") || itemID.startsWith("REAPER"))) {
+                String percent = null;
+                String defence = null;
+                List<String> lore = ItemUtils.getItemLore(itemStack);
+                for (String loreLine : lore) {
+                    Matcher matcher = SLAYER_ARMOR_STACK_PATTERN.matcher(TextUtils.stripColor(loreLine));
+                    if (matcher.matches()) { // Example: line§5§o§7Next Upgrade: §a+240❈ §8(§a14,418§7/§c15,000§8)
+                        try {
+                            float percentage = Float.parseFloat(matcher.group(2).replace(",", "")) /
+                                    Integer.parseInt(matcher.group(3).replace(",", "")) * 100;
+                            BigDecimal bigDecimal = new BigDecimal(percentage).setScale(0, RoundingMode.HALF_UP);
+                            percent = bigDecimal.toString();
+                            defence = ColorCode.GREEN + matcher.group(1);
+                            break;
+                        } catch (NumberFormatException ignored) {
                         }
                     }
-                    if (percent != null && defence != null) {
-                        SlayerArmorProgress currentProgress = slayerArmorProgresses[i];
-
-                        if (currentProgress == null || itemStack != currentProgress.getItemStack()) {
-                            // The item has changed or didn't exist. Create new object.
-                            slayerArmorProgresses[i] = new SlayerArmorProgress(itemStack, percent, defence);
-                        } else {
-                            // The item has remained the same. Just update the stats.
-                            currentProgress.setPercent(percent);
-                            currentProgress.setDefence(defence);
-                        }
-                    }
-                } else {
-                    slayerArmorProgresses[i] = null;
                 }
+                if (percent != null && defence != null) {
+                    SlayerArmorProgress currentProgress = slayerArmorProgresses[i];
+
+                    if (currentProgress == null || itemStack != currentProgress.getItemStack()) {
+                        // The item has changed or didn't exist. Create new object.
+                        slayerArmorProgresses[i] = new SlayerArmorProgress(itemStack, percent, defence);
+                    } else {
+                        // The item has remained the same. Just update the stats.
+                        currentProgress.setPercent(percent);
+                        currentProgress.setDefence(defence);
+                    }
+                }
+            } else {
+                slayerArmorProgresses[i] = null;
             }
         }
     }
@@ -473,7 +465,10 @@ public class InventoryUtils {
                     if (inventoryTypeItr.equals(InventoryType.MAYOR)) {
                         try {
                             String mayorName = m.group("mayor");
-                            if (!mayorName.startsWith(main.getUtils().getMayor())) {
+                            if (!mayorName.equals(main.getUtils().getMayor())) {
+                                // Update new mayor data from API
+                                DataUtils.loadOnlineData(new MayorRequest(mayorName));
+
                                 main.getUtils().setMayor(mayorName);
                                 logger.info("Mayor changed to {}", mayorName);
                             }
@@ -510,4 +505,50 @@ public class InventoryUtils {
         }
         return inventoryType.getInventoryName() + inventoryPageNum;
     }
+
+    /**
+     * Custom HashMap for handle inventory differences
+     * </br>Key: Display Name, Value: Diff size and ItemStack pair
+     */
+    private static class DiffHashMap extends HashMap<String, Pair<Integer, ItemStack>> {
+
+        public void updateWithItem(ItemStack itemStack) {
+            String skyblockId = ItemUtils.getSkyblockItemID(itemStack);
+
+            String displayName = itemStack.getDisplayName();
+            // Exceptions
+            if ("ENCHANTED_BOOK".equals(skyblockId) || "ATTRIBUTE_SHARD".equals(skyblockId)) {
+                List<String> lore = ItemUtils.getItemLore(itemStack);
+                if (!lore.isEmpty()) {
+                    displayName = lore.get(0);
+                }
+            } else if (itemStack.getItem() == Items.dye) {
+                if (main.getUtils().isInDungeon() && StringUtils.isBlank(displayName)) {
+                    // Ignore Archer's ghost abilities cooldown
+                    return;
+                } else if (LocationUtils.isOn(Island.KUUDRA) && (displayName.contains("You will be revived in")
+                        || displayName.contains("Purchasable revive is on cooldown!"))) {
+                    // Ignore revive counter and Purchase Revive cooldown items in Kuudra
+                    return;
+                }
+            } else if (ItemUtils.isQuiverArrow(itemStack)) {
+                // Ignore quiver arrow
+                return;
+            } else if ("INFINITE_SUPERBOOM_TNT".equals(skyblockId) || "LESSER_ORB_OF_HEALING".equals(skyblockId)) {
+                // TODO add this to data repository
+                // Ignore Infinityboom TNT and Lesser Orb of Healing
+                return;
+            }
+
+            int amount;
+            if (this.containsKey(displayName)) {
+                amount = this.get(displayName).getLeft() + itemStack.stackSize;
+            } else {
+                amount = itemStack.stackSize;
+            }
+
+            this.put(displayName, new Pair<>(amount, itemStack));
+        }
+    }
+
 }

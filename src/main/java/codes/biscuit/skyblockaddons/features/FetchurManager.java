@@ -1,23 +1,19 @@
 package codes.biscuit.skyblockaddons.features;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
-import codes.biscuit.skyblockaddons.misc.scheduler.Scheduler;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
+import codes.biscuit.skyblockaddons.core.feature.FeatureSetting;
 import codes.biscuit.skyblockaddons.utils.ItemUtils;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 
-import java.util.Calendar;
-import java.util.GregorianCalendar;
-import java.util.TimeZone;
+import java.time.Instant;
 
 /**
  * Manages the Fetchur Feature, Pointing out which item Fetchur wants next
- *
  * @author Pedro9558
  */
 public class FetchurManager {
@@ -25,21 +21,17 @@ public class FetchurManager {
     @Getter
     private static final FetchurManager instance = new FetchurManager();
     private static final long MILLISECONDS_IN_A_DAY = 24 * 60 * 60 * 1000;
-    // Hypixel timezone
-    // Currently using new york timezone, gotta check november 7th to see if this still works
-    @Getter
-    private static final TimeZone fetchurZone = TimeZone.getTimeZone("America/New_York");
-    private static final Calendar fetchurCalendar = new GregorianCalendar(TimeZone.getTimeZone("America/New_York"));
 
     @Getter
     private final String fetchurTaskCompletedPhrase = "thanks thats probably what i needed";
 
     @Getter
     private final String fetchurAlreadyDidTaskPhrase = "come back another time, maybe tmrw";
-    // A list containing the items fetchur wants
-    // If you want to put it in a repository, YOU MUST PUT IT IN THE EXACT SAME ORDER AS I PLACED ON THIS LIST
-    // Changing the order will affect the algorithm
-    // I tried to fix(thats why they are in a different order) (if hypixel changes again it breaks)
+
+    /**
+     * A list containing the items Fetchur wants.
+     * Changing the order will affect the algorithm
+     */
     private static final FetchurItem[] items = new FetchurItem[]{
             new FetchurItem(new ItemStack(Blocks.stained_glass, 20, 4), "Yellow Stained Glass"),
             new FetchurItem(new ItemStack(Items.compass, 1), "Compass"),
@@ -72,10 +64,9 @@ public class FetchurManager {
     }
 
     /**
-     * Figure out whether the player submitted today's fetchur item.
-     * Can return incorrect answer if the player handed in Fetchur today, but sba wasn't loaded at the time.
+     * Figure out whether the player submitted today's Fetchur item.
+     * Can return incorrect answer if the player handed in Fetchur today, but SBA wasn't loaded at the time.
      * Clicking Fetchur again (and reading the NPC response) will update the value to be correct.
-     *
      * @return {@code true} iff the player hasn't yet submitted the item in today (EST).
      */
     public boolean hasFetchedToday() {
@@ -86,14 +77,12 @@ public class FetchurManager {
     }
 
     /**
-     * Returns the day of the month in the fetchur calendar (EST time zone)
-     *
-     * @param currTimeMilis Epoch UTC miliseconds (e.g. from {@link System#currentTimeMillis()})
-     * @return the 1-indexed day of the month in the fetchur time zone
+     * Returns the day of the month in the Fetchur calendar (EST time zone)
+     * @param currTimeMillis Epoch UTC milliseconds (e.g. from {@link System#currentTimeMillis()})
+     * @return the 1-indexed day of the month in the Fetchur time zone
      */
-    private int getFetchurDayOfMonth(long currTimeMilis) {
-        fetchurCalendar.setTimeInMillis(currTimeMilis);
-        return fetchurCalendar.get(Calendar.DAY_OF_MONTH);
+    private int getFetchurDayOfMonth(long currTimeMillis) {
+        return Instant.ofEpochMilli(currTimeMillis).atZone(SkyblockAddons.getHypixelZoneId()).getDayOfMonth();
     }
 
     /**
@@ -106,10 +95,9 @@ public class FetchurManager {
             currentItemSaved = item;
             SkyblockAddons main = SkyblockAddons.getInstance();
             // Warn player when there's a change
-            if (main.getConfigValues().isEnabled(Feature.WARN_WHEN_FETCHUR_CHANGES)) {
+            if (Feature.FETCHUR_TODAY.isEnabled(FeatureSetting.WARN_WHEN_FETCHUR_CHANGES)) {
                 main.getUtils().playLoudSound("random.orb", 0.5);
-                main.getRenderListener().setTitleFeature(Feature.WARN_WHEN_FETCHUR_CHANGES);
-                main.getScheduler().schedule(Scheduler.CommandType.RESET_TITLE_FEATURE, main.getConfigValues().getWarningSeconds());
+                main.getRenderListener().setTitleFeature(Feature.FETCHUR_TODAY);
             }
         }
     }
@@ -118,8 +106,7 @@ public class FetchurManager {
      * Triggered if the player has just given the correct item, or has already given the correct item, to Fetchur.
      */
     public void saveLastTimeFetched() {
-        SkyblockAddons main = SkyblockAddons.getInstance();
-        main.getPersistentValuesManager().setLastTimeFetchur(System.currentTimeMillis());
+        SkyblockAddons.getInstance().getPersistentValuesManager().setLastTimeFetchur(System.currentTimeMillis());
     }
 
     /**
@@ -132,20 +119,26 @@ public class FetchurManager {
     }
 
     /**
-     * A class representing the item fetchur wants
-     * containing the item instance and the text format of the item
+     * A class representing the item fetchur wants containing the item instance and the text format of the item
      */
-    @Getter @AllArgsConstructor
+    @Getter
     public static class FetchurItem {
         private final ItemStack itemStack;
         private final String itemText;
 
+        FetchurItem(ItemStack itemStack, String itemText) {
+            this.itemStack = itemStack;
+            this.itemText = itemText;
+        }
+
         @Override
         public boolean equals(Object anotherObject) {
-            if (!(anotherObject instanceof FetchurItem))
-                return false;
-            FetchurItem another = (FetchurItem) anotherObject;
-            return another.getItemText().equals(this.getItemText()) && another.getItemStack().equals(this.getItemStack());
+            if (anotherObject instanceof FetchurItem) {
+                FetchurItem another = (FetchurItem) anotherObject;
+                return another.itemText.equals(this.itemText)
+                        && another.itemStack.getIsItemStackEqual(this.itemStack);
+            }
+            return false;
         }
     }
 

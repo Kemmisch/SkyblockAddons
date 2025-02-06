@@ -1,7 +1,8 @@
 package codes.biscuit.skyblockaddons.features;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
+import codes.biscuit.skyblockaddons.core.Island;
 import codes.biscuit.skyblockaddons.utils.LocationUtils;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.Getter;
@@ -18,9 +19,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class EndstoneProtectorManager {
-    private static final Minecraft mc = Minecraft.getMinecraft();
-    private static final SkyblockAddons main = SkyblockAddons.getInstance();
-    private static final Logger logger = SkyblockAddons.getLogger();
+
+    private static final Minecraft MC = Minecraft.getMinecraft();
+    private static final Logger LOGGER = SkyblockAddons.getLogger();
 
     @Getter private static boolean canDetectSkull = false;
     @Getter private static Stage minibossStage = null;
@@ -29,9 +30,8 @@ public class EndstoneProtectorManager {
     private static long lastWaveStart = -1;
 
     public static void checkGolemStatus() {
-        if (mc.theWorld != null && LocationUtils.isInTheEnd(main.getUtils().getLocation()) &&
-                main.getConfigValues().isEnabled(Feature.ENDSTONE_PROTECTOR_DISPLAY)) {
-            World world = mc.theWorld;
+        if (MC.theWorld != null && LocationUtils.isOn(Island.THE_END) && Feature.ENDSTONE_PROTECTOR_DISPLAY.isEnabled()) {
+            World world = MC.theWorld;
 
             Chunk chunk = world.getChunkFromBlockCoords(new BlockPos(-689, 5, -273)); // This is the original spawn.
             if (chunk == null || !chunk.isLoaded()) {
@@ -49,7 +49,7 @@ public class EndstoneProtectorManager {
 
             canDetectSkull = true;
             if (minibossStage != newStage) {
-                int timeTaken = (int) (System.currentTimeMillis()-lastWaveStart);
+                int timeTaken = (int) (System.currentTimeMillis() - lastWaveStart);
                 String previousStage = (minibossStage == null ? "null" : minibossStage.name());
 
                 String zealotsKilled = "N/A";
@@ -57,12 +57,14 @@ public class EndstoneProtectorManager {
                     zealotsKilled = String.valueOf(zealotCount);
                 }
 
-                int totalSeconds = timeTaken/1000;
-                int minutes = totalSeconds/60;
-                int seconds = totalSeconds%60;
+                int totalSeconds = timeTaken / 1000;
+                int minutes = totalSeconds / 60;
+                int seconds = totalSeconds % 60;
 
-                logger.info("Endstone protector stage updated from "+previousStage+" to "+newStage.name()+". " +
-                        "Your zealot kill count was "+zealotsKilled+". This took "+minutes+"m "+seconds+"s.");
+                LOGGER.info(
+                        "Endstone protector stage updated from {} to {}. Your zealot kill count was {}. This took {}m {}s.",
+                        previousStage, newStage.name(), zealotsKilled, minutes, seconds
+                );
 
                 if (minibossStage == Stage.GOLEM_ALIVE && newStage == Stage.NO_HEAD) {
                     zealotCount = 0;
@@ -94,7 +96,8 @@ public class EndstoneProtectorManager {
         STAGE_4(3),
         STAGE_5(4),
         GOLEM_ALIVE(-1);
-        private int blocksUp;
+
+        private final int blocksUp;
 
         Stage(int blocksUp) {
             this.blocksUp = blocksUp;
@@ -103,7 +106,9 @@ public class EndstoneProtectorManager {
         private static Stage lastStage = null;
         private static BlockPos lastPos = null;
 
-        private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat(SkyblockAddons.MOD_NAME + " - Endstone Protector #%d").build());
+        private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(
+                new ThreadFactoryBuilder().setNameFormat(SkyblockAddons.MOD_NAME + " - Endstone Protector #%d").build()
+        );
 
         public static Stage detectStage() {
             EXECUTOR.submit(() -> {
@@ -134,7 +139,7 @@ public class EndstoneProtectorManager {
                     lastStage = Stage.NO_HEAD;
                     lastPos = null;
                 } catch (Throwable ex) {
-                    ex.printStackTrace();
+                    LOGGER.catching(ex);
                     // It's fine I guess, just try checking next tick...
                 }
             });

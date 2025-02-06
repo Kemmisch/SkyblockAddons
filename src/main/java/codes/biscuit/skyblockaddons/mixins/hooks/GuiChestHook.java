@@ -1,15 +1,19 @@
 package codes.biscuit.skyblockaddons.mixins.hooks;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
+import codes.biscuit.skyblockaddons.core.Island;
+import codes.biscuit.skyblockaddons.core.feature.FeatureSetting;
+import codes.biscuit.skyblockaddons.features.ItemDropChecker;
+import codes.biscuit.skyblockaddons.utils.ColorUtils;
+import codes.biscuit.skyblockaddons.utils.LocationUtils;
 import codes.biscuit.skyblockaddons.utils.objects.ReturnValue;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.core.InventoryType;
-import codes.biscuit.skyblockaddons.core.Location;
 import codes.biscuit.skyblockaddons.core.Translations;
 import codes.biscuit.skyblockaddons.core.npc.NPCUtils;
 import codes.biscuit.skyblockaddons.features.backpacks.BackpackColor;
 import codes.biscuit.skyblockaddons.features.backpacks.BackpackInventoryManager;
-import codes.biscuit.skyblockaddons.gui.IslandWarpGui;
+import codes.biscuit.skyblockaddons.gui.screens.IslandWarpGui;
 import codes.biscuit.skyblockaddons.utils.ColorCode;
 import codes.biscuit.skyblockaddons.utils.DrawUtils;
 import codes.biscuit.skyblockaddons.utils.ItemUtils;
@@ -32,6 +36,7 @@ import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -79,9 +84,8 @@ public class GuiChestHook {
         Keyboard.enableRepeatEvents(false);
 
         islandWarpGui = null;
-        BackpackInventoryManager.setBackpackColor(null);
 
-        if (main.getConfigValues().isEnabled(Feature.SHOW_SALVAGE_ESSENCES_COUNTER)) {
+        if (Feature.DUNGEONS_COLLECTED_ESSENCES_DISPLAY.isEnabled(FeatureSetting.SHOW_SALVAGE_ESSENCES_COUNTER)) {
             InventoryType inventoryType = main.getInventoryUtils().getInventoryType();
 
             if (inventoryType == InventoryType.SALVAGING) {
@@ -96,7 +100,7 @@ public class GuiChestHook {
         }
 
         Container playerContainer = mc.thePlayer.openContainer;
-        if (playerContainer instanceof ContainerChest && SkyblockAddons.getInstance().getConfigValues().isEnabled(Feature.FANCY_WARP_MENU)) {
+        if (playerContainer instanceof ContainerChest && Feature.FANCY_WARP_MENU.isEnabled()) {
             IInventory chestInventory = ((ContainerChest) playerContainer).getLowerChestInventory();
             if (chestInventory.hasCustomName()) {
                 String chestName = chestInventory.getDisplayName().getUnformattedText();
@@ -135,8 +139,9 @@ public class GuiChestHook {
         InventoryType inventoryType = SkyblockAddons.getInstance().getInventoryUtils().getInventoryType();
 
         // Essences from TabListParser#parseSections
-        if (main.getConfigValues().isEnabled(Feature.SHOW_SALVAGE_ESSENCES_COUNTER) && inventoryType == InventoryType.SALVAGING
-                && main.getUtils().getLocation().equals(Location.DUNGEON_HUB)) {
+        if (Feature.DUNGEONS_COLLECTED_ESSENCES_DISPLAY.isEnabled(FeatureSetting.SHOW_SALVAGE_ESSENCES_COUNTER)
+                && inventoryType == InventoryType.SALVAGING
+                && LocationUtils.isOn(Island.DUNGEON_HUB)) {
             int ySize = 222 - 108 + 6 * 18;
             float x = guiLeft - 117 - 5;
             float y = guiTop + ySize / 2F - 72 / 2F;
@@ -144,54 +149,58 @@ public class GuiChestHook {
             SkyblockAddons.getInstance().getRenderListener().drawCollectedEssences(x, y, false, true);
         }
 
-        if (SkyblockAddons.getInstance().getConfigValues().isEnabled(Feature.REFORGE_FILTER)) {
-            if ((inventoryType == InventoryType.BASIC_REFORGING || inventoryType == InventoryType.HEX_REFORGING)
-                    && textFieldMatches != null) {
+        if (Feature.REFORGE_FILTER.isEnabled()
+                && (inventoryType == InventoryType.BASIC_REFORGING || inventoryType == InventoryType.HEX_REFORGING)
+                && textFieldMatches != null) {
 
-                int defaultBlue = main.getUtils().getDefaultBlue(255);
-                int x = guiLeft - 160;
-                if (x<0) {
-                    x = 20;
-                }
-                int y = guiTop + REFORGE_MENU_HEIGHT / 2 - reforgeFilterHeight / 2;
+            int defaultBlue = ColorUtils.getDefaultBlue(255);
+            int x = guiLeft - 160;
+            if (x < 0) {
+                x = 20;
+            }
+            int y = guiTop + REFORGE_MENU_HEIGHT / 2 - reforgeFilterHeight / 2;
 
-                GlStateManager.color(1F, 1F, 1F);
-                fontRenderer.drawSplitString(TYPE_ENCHANTMENTS, x, y, maxStringWidth, defaultBlue);
-                y = y + typeEnchantmentsHeight;
-                fontRenderer.drawSplitString(SEPARATE_MULTIPLE, x, y, maxStringWidth, defaultBlue);
+            GlStateManager.color(1F, 1F, 1F);
+            fontRenderer.drawSplitString(TYPE_ENCHANTMENTS, x, y, maxStringWidth, defaultBlue);
+            y = y + typeEnchantmentsHeight;
+            fontRenderer.drawSplitString(SEPARATE_MULTIPLE, x, y, maxStringWidth, defaultBlue);
 
-                int placeholderTextX = textFieldMatches.xPosition + 4;
-                int placeholderTextY = textFieldMatches.yPosition + (textFieldMatches.height - 8) / 2;
+            int placeholderTextX = textFieldMatches.xPosition + 4;
+            int placeholderTextY = textFieldMatches.yPosition + (textFieldMatches.height - 8) / 2;
 
-                y = textFieldMatches.yPosition - enchantsToIncludeHeight - 1;
-                fontRenderer.drawSplitString(ENCHANTS_TO_INCLUDE, x, y, maxStringWidth, defaultBlue);
+            y = textFieldMatches.yPosition - enchantsToIncludeHeight - 1;
+            fontRenderer.drawSplitString(ENCHANTS_TO_INCLUDE, x, y, maxStringWidth, defaultBlue);
 
-                textFieldMatches.drawTextBox();
-                if (StringUtils.isEmpty(textFieldMatches.getText())) {
-                    fontRenderer.drawString(fontRenderer.trimStringToWidth(INCLUSION_EXAMPLE, textFieldMatches.width), placeholderTextX, placeholderTextY, ColorCode.DARK_GRAY.getColor());
-                }
+            textFieldMatches.drawTextBox();
+            if (StringUtils.isEmpty(textFieldMatches.getText())) {
+                fontRenderer.drawString(fontRenderer.trimStringToWidth(INCLUSION_EXAMPLE, textFieldMatches.width), placeholderTextX, placeholderTextY, ColorCode.DARK_GRAY.getColor());
+            }
 
-                y = textFieldExclusions.yPosition - enchantsToExcludeHeight - 1;
-                fontRenderer.drawSplitString(ENCHANTS_TO_EXCLUDE, x, y, maxStringWidth, defaultBlue);
+            y = textFieldExclusions.yPosition - enchantsToExcludeHeight - 1;
+            fontRenderer.drawSplitString(ENCHANTS_TO_EXCLUDE, x, y, maxStringWidth, defaultBlue);
 
-                placeholderTextY = textFieldExclusions.yPosition + (textFieldExclusions.height - 8) / 2;
-                textFieldExclusions.drawTextBox();
-                if (StringUtils.isEmpty(textFieldExclusions.getText())) {
-                    fontRenderer.drawString(fontRenderer.trimStringToWidth(EXCLUSION_EXAMPLE, textFieldExclusions.width), placeholderTextX, placeholderTextY, ColorCode.DARK_GRAY.getColor());
-                }
+            placeholderTextY = textFieldExclusions.yPosition + (textFieldExclusions.height - 8) / 2;
+            textFieldExclusions.drawTextBox();
+            if (StringUtils.isEmpty(textFieldExclusions.getText())) {
+                fontRenderer.drawString(
+                        fontRenderer.trimStringToWidth(EXCLUSION_EXAMPLE, textFieldExclusions.width),
+                        placeholderTextX,
+                        placeholderTextY,
+                        ColorCode.DARK_GRAY.getColor()
+                );
             }
         }
     }
 
     public static void initGui(IInventory lowerChestInventory, int guiLeft, int guiTop, FontRenderer fontRendererObj) {
-        if (!SkyblockAddons.getInstance().getUtils().isOnSkyblock()) {
+        if (!main.getUtils().isOnSkyblock()) {
             return; // don't draw any overlays outside SkyBlock
         }
 
         InventoryType inventoryType = SkyblockAddons.getInstance().getInventoryUtils().getInventoryType();
 
         if (inventoryType != null) {
-            if (SkyblockAddons.getInstance().getConfigValues().isEnabled(Feature.REFORGE_FILTER)
+            if (Feature.REFORGE_FILTER.isEnabled()
                     && (inventoryType == InventoryType.BASIC_REFORGING || inventoryType == InventoryType.HEX_REFORGING)) {
                 int xPos = guiLeft - 160;
                 if (xPos<0) {
@@ -255,7 +264,7 @@ public class GuiChestHook {
     }
 
     public static boolean keyTyped(char typedChar, int keyCode) { // return whether to continue (super.keyTyped(typedChar, keyCode);)
-        if (main.getUtils().isOnSkyblock() && main.getConfigValues().isEnabled(Feature.REFORGE_FILTER)) {
+        if (main.getUtils().isOnSkyblock() && Feature.REFORGE_FILTER.isEnabled()) {
             InventoryType inventoryType = main.getInventoryUtils().getInventoryType();
 
             if (inventoryType == InventoryType.BASIC_REFORGING || inventoryType == InventoryType.HEX_REFORGING) {
@@ -275,7 +284,7 @@ public class GuiChestHook {
     }
 
     private static void processTextFields(char typedChar, int keyCode) {
-        if (main.getConfigValues().isEnabled(Feature.REFORGE_FILTER) && textFieldMatches != null) {
+        if (Feature.REFORGE_FILTER.isEnabled() && textFieldMatches != null) {
             textFieldMatches.textboxKeyTyped(typedChar, keyCode);
             textFieldExclusions.textboxKeyTyped(typedChar, keyCode);
             List<String> reforges = new LinkedList<>(Arrays.asList(textFieldMatches.getText().split(",")));
@@ -287,7 +296,7 @@ public class GuiChestHook {
 
     public static void handleMouseClick(Slot slotIn, Container slots, IInventory lowerChestInventory, ReturnValue<?> returnValue) {
         if (main.getUtils().isOnSkyblock()) {
-            if (main.getConfigValues().isEnabled(Feature.REFORGE_FILTER) && !main.getUtils().getReforgeMatches().isEmpty()) {
+            if (Feature.REFORGE_FILTER.isEnabled() && !main.getUtils().getReforgeMatches().isEmpty()) {
                 if (slotIn != null && !slotIn.inventory.equals(mc.thePlayer.inventory) && slotIn.getHasStack()) {
                     InventoryType inventoryType = main.getInventoryUtils().getInventoryType();
 
@@ -317,11 +326,11 @@ public class GuiChestHook {
                 }
             }
 
-            if (main.getConfigValues().isEnabled(Feature.STOP_DROPPING_SELLING_RARE_ITEMS) && !main.getUtils().isInDungeon() &&
-                    NPCUtils.isSellMerchant(lowerChestInventory) && slotIn != null && slotIn.inventory instanceof InventoryPlayer) {
-                if (!main.getUtils().getItemDropChecker().canDropItem(slotIn)) {
+            if (Feature.STOP_DROPPING_SELLING_RARE_ITEMS.isEnabled() && !main.getUtils().isInDungeon()
+                    && NPCUtils.isSellMerchant(lowerChestInventory)
+                    && slotIn != null && slotIn.inventory instanceof InventoryPlayer
+                    && !ItemDropChecker.canDropItem(slotIn)) {
                     returnValue.cancel();
-                }
             }
         }
     }
@@ -346,22 +355,21 @@ public class GuiChestHook {
         }
     }
 
-    public static void color(float colorRed, float colorGreen, float colorBlue, float colorAlpha, IInventory lowerChestInventory) { //Item item, ItemStack stack
+    public static List<Float> color(IInventory lowerChestInventory) {
         if (!main.getUtils().isOnSkyblock()) {
-            return;
+            return Collections.emptyList();
         }
 
-        if (main.getConfigValues().isEnabled(Feature.SHOW_BACKPACK_PREVIEW) &&
-                main.getConfigValues().isEnabled(Feature.MAKE_BACKPACK_INVENTORIES_COLORED) && lowerChestInventory.hasCustomName()) {
-            if (lowerChestInventory.getDisplayName().getUnformattedText().contains("Backpack")) {
-                if (BackpackInventoryManager.getBackpackColor() != null) {
-                    BackpackColor color = BackpackInventoryManager.getBackpackColor();
-                    GlStateManager.color(color.getR(), color.getG(), color.getB(), 1);
-                    return;
+        if (Feature.SHOW_BACKPACK_PREVIEW.isEnabled(FeatureSetting.MAKE_INVENTORY_COLORED)) {
+            if (main.getInventoryUtils().getInventoryType() == InventoryType.STORAGE_BACKPACK) {
+                int pageNum = main.getInventoryUtils().getInventoryPageNum();
+                if (BackpackInventoryManager.getBackpackColor().containsKey(pageNum)) {
+                    BackpackColor color = BackpackInventoryManager.getBackpackColor().get(pageNum);
+                    return Arrays.asList(color.getR(), color.getG(), color.getB(), 1.0F);
                 }
             }
         }
-        GlStateManager.color(colorRed, colorGreen, colorBlue, colorAlpha);
+        return Collections.emptyList();
     }
 
     public static void mouseReleased(ReturnValue<?> returnValue) {
@@ -381,7 +389,7 @@ public class GuiChestHook {
             return; // don't draw any overlays outside SkyBlock
         }
 
-        if (main.getConfigValues().isEnabled(Feature.SHOW_REFORGE_OVERLAY)) {
+        if (Feature.SHOW_REFORGE_OVERLAY.isEnabled()) {
             if (guiChest.inventorySlots.inventorySlots.size() > 13) {
                 InventoryType inventoryType = main.getInventoryUtils().getInventoryType();
 
@@ -399,7 +407,7 @@ public class GuiChestHook {
 
                         if (reforge != null) {
                             int color = ColorCode.YELLOW.getColor();
-                            if (main.getConfigValues().isEnabled(Feature.REFORGE_FILTER) &&
+                            if (Feature.REFORGE_FILTER.isEnabled() &&
                                     !main.getUtils().getReforgeMatches().isEmpty() &&
                                     main.getUtils().enchantReforgeMatches(reforge)) {
                                 color = ColorCode.RED.getColor();

@@ -1,9 +1,9 @@
 package codes.biscuit.skyblockaddons.mixins.hooks;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.utils.objects.ReturnValue;
-import codes.biscuit.skyblockaddons.core.Feature;
-import codes.biscuit.skyblockaddons.core.Location;
+import codes.biscuit.skyblockaddons.core.Island;
+import codes.biscuit.skyblockaddons.utils.LocationUtils;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.core.npc.NPCUtils;
 import codes.biscuit.skyblockaddons.features.JerryPresent;
 import codes.biscuit.skyblockaddons.utils.ItemUtils;
@@ -17,59 +17,60 @@ import net.minecraft.entity.item.EntityItemFrame;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
 import net.minecraft.util.BlockPos;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 public class RenderManagerHook {
 
     private static final int HIDE_RADIUS_SQUARED = 7 * 7;
-    private static final String HAUNTED_SKULL_TEXTURE = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvMmYyNGVkNjg3NTMwNGZhNGExZjBjNzg1YjJjYjZhNmE3MjU2M2U5ZjNlMjRlYTU1ZTE4MTc4NDUyMTE5YWE2NiJ9fX0=";
+    private static final String HAUNTED_SKULL_TEXTURE = "eyJ0aW1lc3RhbXAiOjE1NTk1ODAzNjI1NTMsInByb2ZpbGVJZCI6ImU3NmYwZDlhZjc4MjQyYzM5NDY2ZDY3MjE3MzBmNDUzIiwicHJvZmlsZU5hbWUiOiJLbGxscmFoIiwic2lnbmF0dXJlUmVxdWlyZWQiOnRydWUsInRleHR1cmVzIjp7IlNLSU4iOnsidXJsIjoiaHR0cDovL3RleHR1cmVzLm1pbmVjcmFmdC5uZXQvdGV4dHVyZS8yZjI0ZWQ2ODc1MzA0ZmE0YTFmMGM3ODViMmNiNmE2YTcyNTYzZTlmM2UyNGVhNTVlMTgxNzg0NTIxMTlhYTY2In19fQ==";
 
-    public static void shouldRender(Entity entityIn, ReturnValue<Boolean> returnValue) {
+    public static void shouldRender(Entity entityIn, CallbackInfoReturnable<Boolean> cir) {
         Minecraft mc = Minecraft.getMinecraft();
         SkyblockAddons main = SkyblockAddons.getInstance();
 
         if (main.getUtils().isOnSkyblock()) {
-            Location currentLocation = main.getUtils().getLocation();
-
-            if (main.getConfigValues().isEnabled(Feature.HIDE_BONES) && main.getInventoryUtils().isWearingSkeletonHelmet()) {
+            if (Feature.HIDE_BONES.isEnabled() && main.getInventoryUtils().isWearingSkeletonHelmet()) {
                 if (entityIn instanceof EntityItem && entityIn.ridingEntity instanceof EntityArmorStand && entityIn.ridingEntity.isInvisible()) {
                     EntityItem entityItem = (EntityItem) entityIn;
                     if (entityItem.getEntityItem().getItem().equals(Items.bone)) {
-                        returnValue.cancel();
+                        cir.cancel();
                     }
                 }
             }
-            if (main.getConfigValues().isEnabled(Feature.HIDE_HAUNTED_SKULLS) && main.getUtils().isInDungeon()) {
+            if (Feature.HIDE_HAUNTED_SKULLS.isEnabled() && main.getUtils().isInDungeon()) {
                 if (entityIn instanceof EntityArmorStand && entityIn.isInvisible()) {
                     EntityArmorStand armorStand = (EntityArmorStand) entityIn;
                     String skullID = ItemUtils.getSkullTexture(armorStand.getEquipmentInSlot(4));
                     if (HAUNTED_SKULL_TEXTURE.equals(skullID)) {
-                        returnValue.cancel();
+                        cir.cancel();
                     }
                 }
             }
-            if (mc.theWorld != null && main.getConfigValues().isEnabled(Feature.HIDE_PLAYERS_NEAR_NPCS) && currentLocation != Location.GUEST_ISLAND && currentLocation != Location.THE_CATACOMBS) {
+            if (mc.theWorld != null && Feature.HIDE_PLAYERS_NEAR_NPCS.isEnabled() && !main.getUtils().isGuest()
+                    && !LocationUtils.isOn(Island.DUNGEON)) {
                 if (entityIn instanceof EntityOtherPlayerMP && !NPCUtils.isNPC(entityIn) && NPCUtils.isNearNPC(entityIn)) {
-                    returnValue.cancel();
+                    cir.cancel();
                 }
             }
-            if (main.getConfigValues().isEnabled(Feature.HIDE_SPAWN_POINT_PLAYERS)) {
+            if (Feature.HIDE_SPAWN_POINT_PLAYERS.isEnabled()) {
                 BlockPos entityPosition = entityIn.getPosition();
-                if (entityIn instanceof EntityPlayer && entityPosition.getX() == -2 && entityPosition.getY() == 70 && entityPosition.getZ() == -69 && currentLocation == Location.VILLAGE) {
-                    returnValue.cancel();
+                if (entityIn instanceof EntityPlayer && LocationUtils.isOn("Village")
+                        && entityPosition.getX() == -2
+                        && entityPosition.getY() == 70
+                        && entityPosition.getZ() == -69) {
+                    cir.cancel();
                 }
             }
-            if (main.getConfigValues().isEnabled(Feature.HIDE_PLAYERS_IN_LOBBY)) {
-                if (currentLocation == Location.VILLAGE || currentLocation == Location.AUCTION_HOUSE || currentLocation == Location.BANK) {
-                    if ((entityIn instanceof EntityOtherPlayerMP || entityIn instanceof EntityFX || entityIn instanceof EntityItemFrame) &&
-                            !NPCUtils.isNPC(entityIn) && entityIn.getDistanceSqToEntity(mc.thePlayer) > HIDE_RADIUS_SQUARED) {
-                        returnValue.cancel();
-                    }
+            if (Feature.HIDE_PLAYERS_IN_LOBBY.isEnabled() && LocationUtils.isOn("Village", "Auction House", "Bank")) {
+                if ((entityIn instanceof EntityOtherPlayerMP || entityIn instanceof EntityFX || entityIn instanceof EntityItemFrame)
+                        && !NPCUtils.isNPC(entityIn) && entityIn.getDistanceSqToEntity(mc.thePlayer) > HIDE_RADIUS_SQUARED) {
+                    cir.cancel();
                 }
             }
-            if (main.getConfigValues().isEnabled(Feature.HIDE_OTHER_PLAYERS_PRESENTS)) {
+            if (Feature.HIDE_OTHER_PLAYERS_PRESENTS.isEnabled()) {
                 JerryPresent present = JerryPresent.getJerryPresents().get(entityIn.getUniqueID());
                 if (present != null && present.shouldHide()) {
-                    returnValue.cancel();
+                    cir.cancel();
                 }
             }
         }

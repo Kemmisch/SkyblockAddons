@@ -2,10 +2,12 @@ package codes.biscuit.skyblockaddons.features.tablist;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
 import codes.biscuit.skyblockaddons.core.EssenceType;
-import codes.biscuit.skyblockaddons.core.Feature;
-import codes.biscuit.skyblockaddons.core.Location;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
+import codes.biscuit.skyblockaddons.core.Island;
 import codes.biscuit.skyblockaddons.core.SkillType;
-import codes.biscuit.skyblockaddons.features.spookyevent.SpookyEventManager;
+import codes.biscuit.skyblockaddons.core.feature.FeatureSetting;
+import codes.biscuit.skyblockaddons.features.spooky.SpookyEventManager;
+import codes.biscuit.skyblockaddons.utils.LocationUtils;
 import codes.biscuit.skyblockaddons.utils.TextUtils;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
@@ -205,7 +207,7 @@ public class TabListParser {
                 String stripped = TextUtils.stripColor(line).trim();
                 Matcher m;
 
-                if (!foundEssenceSection && main.getConfigValues().isEnabled(Feature.SHOW_SALVAGE_ESSENCES_COUNTER)
+                if (!foundEssenceSection && Feature.DUNGEONS_COLLECTED_ESSENCES_DISPLAY.isEnabled(FeatureSetting.SHOW_SALVAGE_ESSENCES_COUNTER)
                         && stripped.contains("Essence:")) {
                     foundEssenceSection = true;
                 }
@@ -220,16 +222,15 @@ public class TabListParser {
                     }
                 }
 
-                if (parsedRainTime == null && main.getConfigValues().isEnabled(Feature.BIRCH_PARK_RAINMAKER_TIMER)
-                        && main.getUtils().getLocation() == Location.BIRCH_PARK
+                if (parsedRainTime == null && Feature.BIRCH_PARK_RAINMAKER_TIMER.isEnabled()
+                        && LocationUtils.isOn("Birch Park")
                         && (m = RAIN_TIME_PATTERN.matcher(stripped)).matches()) {
                     parsedRainTime = m.group("time");
                 }
 
-                if (!foundSkillSection && !foundSkill && main.getConfigValues().isDisabled(Feature.SHOW_SKILL_PERCENTAGE_INSTEAD_OF_XP)) {
+                if (!foundSkillSection && !foundSkill && Feature.SKILL_DISPLAY.isDisabled(FeatureSetting.SHOW_SKILL_PERCENTAGE_INSTEAD_OF_XP)) {
                     // The Catacombs still have old tab list instead of new Widgets
-                    if (main.getUtils().getLocation() == Location.THE_CATACOMBS
-                            && (m = OLD_SKILL_LEVEL_PATTERN.matcher(stripped)).matches()) {
+                    if (LocationUtils.isOn(Island.DUNGEON) && (m = OLD_SKILL_LEVEL_PATTERN.matcher(stripped)).matches()) {
                         SkillType skillType = SkillType.getFromString(m.group("skill"));
                         int level = Integer.parseInt(m.group("level"));
                         main.getSkillXpManager().setSkillLevel(skillType, level);
@@ -332,11 +333,11 @@ public class TabListParser {
      * @return true If related features disabled
      */
     private static boolean isRelatedFeaturesDisabled() {
-        return main.getConfigValues().isDisabled(Feature.COMPACT_TAB_LIST)
-                && main.getConfigValues().isDisabled(Feature.SHOW_SALVAGE_ESSENCES_COUNTER)
-                && main.getConfigValues().isDisabled(Feature.BIRCH_PARK_RAINMAKER_TIMER)
-                && main.getConfigValues().isDisabled(Feature.CANDY_POINTS_COUNTER)
-                && (main.getConfigValues().isDisabled(Feature.SKILL_DISPLAY)
-                || main.getConfigValues().isEnabled(Feature.SHOW_SKILL_PERCENTAGE_INSTEAD_OF_XP));
+        return Feature.COMPACT_TAB_LIST.isDisabled()
+                && Feature.DUNGEONS_COLLECTED_ESSENCES_DISPLAY.isDisabled(FeatureSetting.SHOW_SALVAGE_ESSENCES_COUNTER)
+                && Feature.BIRCH_PARK_RAINMAKER_TIMER.isDisabled()
+                && Feature.CANDY_POINTS_COUNTER.isDisabled()
+                && (Feature.SKILL_DISPLAY.isDisabled()
+                || Feature.SKILL_DISPLAY.isEnabled(FeatureSetting.SHOW_SKILL_PERCENTAGE_INSTEAD_OF_XP));
     }
 }

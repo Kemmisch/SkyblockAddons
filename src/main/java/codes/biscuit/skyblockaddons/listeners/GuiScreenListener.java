@@ -1,32 +1,41 @@
 package codes.biscuit.skyblockaddons.listeners;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.core.InventoryType;
 import codes.biscuit.skyblockaddons.core.Translations;
 import codes.biscuit.skyblockaddons.events.InventoryLoadingDoneEvent;
 import codes.biscuit.skyblockaddons.features.PetManager;
+import codes.biscuit.skyblockaddons.features.backpacks.BackpackColor;
+import codes.biscuit.skyblockaddons.features.backpacks.BackpackInventoryManager;
 import codes.biscuit.skyblockaddons.features.backpacks.ContainerPreviewManager;
-import codes.biscuit.skyblockaddons.features.dungeonmap.DungeonMapManager;
-import codes.biscuit.skyblockaddons.gui.LocationEditGui;
-import codes.biscuit.skyblockaddons.misc.scheduler.ScheduledTask;
-import codes.biscuit.skyblockaddons.misc.scheduler.SkyblockRunnable;
+import codes.biscuit.skyblockaddons.core.SkyblockKeyBinding;
+import codes.biscuit.skyblockaddons.core.scheduler.ScheduledTask;
+import codes.biscuit.skyblockaddons.gui.screens.SkyblockAddonsScreen;
 import codes.biscuit.skyblockaddons.mixins.hooks.GuiChestHook;
 import codes.biscuit.skyblockaddons.mixins.hooks.GuiContainerHook;
 import codes.biscuit.skyblockaddons.utils.ColorCode;
 import codes.biscuit.skyblockaddons.utils.DevUtils;
+import codes.biscuit.skyblockaddons.utils.ItemUtils;
+import codes.biscuit.skyblockaddons.utils.data.DataUtils;
+import codes.biscuit.skyblockaddons.utils.data.requests.MayorRequest;
 import codes.biscuit.skyblockaddons.utils.objects.Pair;
 import lombok.Getter;
+import lombok.NonNull;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiChest;
 import net.minecraft.client.gui.inventory.GuiContainer;
+import net.minecraft.init.Items;
 import net.minecraft.inventory.InventoryBasic;
 import net.minecraft.inventory.Slot;
+import net.minecraft.item.ItemStack;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.InputEvent;
+import org.apache.logging.log4j.Logger;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
@@ -42,6 +51,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class GuiScreenListener {
 
     private final SkyblockAddons main = SkyblockAddons.getInstance();
+    private static final Logger logger = SkyblockAddons.getLogger();
 
     private InventoryChangeListener inventoryChangeListener;
     private InventoryBasic listenedInventory;
@@ -66,12 +76,12 @@ public class GuiScreenListener {
 
         if (guiScreen instanceof GuiChest) {
             GuiChest guiChest = (GuiChest) guiScreen;
-            InventoryType inventoryType = SkyblockAddons.getInstance().getInventoryUtils().updateInventoryType(guiChest);
+            InventoryType inventoryType = main.getInventoryUtils().updateInventoryType(guiChest);
             InventoryBasic chestInventory = (InventoryBasic) guiChest.lowerChestInventory;
             addInventoryChangeListener(chestInventory);
 
             // Backpack opening sound
-            if (main.getConfigValues().isEnabled(Feature.BACKPACK_OPENING_SOUND) && chestInventory.hasCustomName()) {
+            if (Feature.BACKPACK_OPENING_SOUND.isEnabled() && chestInventory.hasCustomName()) {
                 if (chestInventory.getDisplayName().getUnformattedText().contains("Backpack")) {
                     lastBackpackOpenMs = System.currentTimeMillis();
 
@@ -83,7 +93,7 @@ public class GuiScreenListener {
                 }
             }
 
-            if (main.getConfigValues().isEnabled(Feature.SHOW_BACKPACK_PREVIEW)) {
+            if (Feature.SHOW_BACKPACK_PREVIEW.isEnabled()) {
                 if (inventoryType == InventoryType.STORAGE_BACKPACK || inventoryType == InventoryType.ENDER_CHEST) {
                     ContainerPreviewManager.onContainerOpen(chestInventory);
                 }
@@ -101,8 +111,9 @@ public class GuiScreenListener {
         GuiScreen oldGuiScreen = Minecraft.getMinecraft().currentScreen;
 
         // Closing a container
-        if (guiScreen == null && oldGuiScreen instanceof GuiContainer) {
+        if (guiScreen == null && (oldGuiScreen instanceof GuiContainer || oldGuiScreen instanceof SkyblockAddonsScreen)) {
             lastContainerCloseMs = System.currentTimeMillis();
+            main.getInventoryUtils().setInventoryType(null);
         }
 
         // Closing or switching to a different GuiChest
@@ -119,47 +130,72 @@ public class GuiScreenListener {
 
     /**
      * Listens for key presses while a GUI is open
-     *
-     * @param event the {@code GuiScreenEvent.KeyboardInputEvent} to listen for
+     * @param event the {@link PlayerListener#onKeyInput(InputEvent)} to listen for
      */
     @SubscribeEvent
     public void onKeyInput(GuiScreenEvent.KeyboardInputEvent.Pre event) {
         int eventKey = Keyboard.getEventKey();
+        GuiScreen guiScreen = event.gui;
 
-        if (main.getConfigValues().isEnabled(Feature.DEVELOPER_MODE) && eventKey == main.getDeveloperCopyNBTKey().getKeyCode() && Keyboard.getEventKeyState()) {
-            // Copy Item NBT
-            GuiScreen currentScreen = event.gui;
-
-            // Check if the player is in an inventory.
-            if (GuiContainer.class.isAssignableFrom(currentScreen.getClass())) {
-                Slot currentSlot = ((GuiContainer) currentScreen).getSlotUnderMouse();
-
-                if (currentSlot != null && currentSlot.getHasStack()) {
-                    DevUtils.setCopyMode(DevUtils.CopyMode.ITEM);
-                    DevUtils.copyNBTTagToClipboard(
-                            currentSlot.getStack().serializeNBT(),
-                            ColorCode.GREEN + "Item data was copied to clipboard!"
-                    );
-                }
-            }
+        // Copy NBT, check if the player is in an inventory.
+        if (guiScreen instanceof GuiContainer) {
+            this.onDeveloperKeyPressed((GuiContainer) guiScreen);
         }
 
-        if (main.getConfigValues().isEnabled(Feature.DUNGEONS_MAP_DISPLAY) &&
-                main.getConfigValues().isEnabled(Feature.CHANGE_DUNGEON_MAP_ZOOM_WITH_KEYBOARD) &&
-                Minecraft.getMinecraft().currentScreen instanceof LocationEditGui) {
-            if (Keyboard.isKeyDown(main.getKeyBindings().get(5).getKeyCode()) && Keyboard.getEventKeyState()) {
-                DungeonMapManager.decreaseZoomByStep();
-            } else if (Keyboard.isKeyDown(main.getKeyBindings().get(4).getKeyCode()) && Keyboard.getEventKeyState()) {
-                DungeonMapManager.increaseZoomByStep();
-            }
+        if (main.getUtils().isOnSkyblock()) {
+            ContainerPreviewManager.onContainerKeyTyped(eventKey);
         }
     }
 
     @SubscribeEvent
     public void onInventoryLoadingDone(InventoryLoadingDoneEvent e) {
+        GuiScreen guiScreen = Minecraft.getMinecraft().currentScreen;
+
         if (listenedInventory != null) {
             removeInventoryChangeListener(listenedInventory);
             lastInventoryChangeMs = -1;
+        }
+
+        if (guiScreen instanceof GuiChest) {
+            GuiChest guiChest = (GuiChest) guiScreen;
+            InventoryBasic chestInventory = (InventoryBasic) guiChest.lowerChestInventory;
+
+            // Save backpack colors
+            if (main.getInventoryUtils().getInventoryType() == InventoryType.STORAGE) {
+                for (int i = 0; i < chestInventory.getSizeInventory(); i++) {
+                    ItemStack item = chestInventory.getStackInSlot(i);
+                    if (item == null || item.getItem() != Items.skull) continue;
+
+                    BackpackColor backpackColor = ItemUtils.getBackpackColor(item);
+                    if (backpackColor != null) {
+                        int slot = ItemUtils.getBackpackSlot(item);
+                        if (slot != 0) {
+                            BackpackInventoryManager.getBackpackColor().put(slot, backpackColor);
+                        }
+                    }
+                }
+            } else if (main.getInventoryUtils().getInventoryType() == InventoryType.CALENDAR) {
+                for (int i = 0; i < chestInventory.getSizeInventory(); i++) {
+                    ItemStack item = chestInventory.getStackInSlot(i);
+                    if (item == null || item.getItem() != Items.skull) continue;
+
+                    if (item.getDisplayName().contains("Mayor ")) {
+                        String mayorName = item.getDisplayName();
+                        mayorName = mayorName.substring(mayorName.indexOf(' ') + 1);
+
+                        if (!mayorName.equals(main.getUtils().getMayor())) {
+                            // Update new mayor data from API
+                            DataUtils.loadOnlineData(new MayorRequest(mayorName));
+
+                            main.getUtils().setMayor(mayorName);
+                            logger.info("Mayor changed to {}", mayorName);
+                        }
+
+                        break;
+                    }
+                }
+            }
+
         }
     }
 
@@ -176,9 +212,15 @@ public class GuiScreenListener {
             return;
         }
 
-        if (main.getConfigValues().isEnabled(Feature.LOCK_SLOTS) && event.gui instanceof GuiContainer) {
-            GuiContainer guiContainer = (GuiContainer) event.gui;
+        // Check if the player is in an inventory.
+        GuiContainer guiContainer;
+        if (event.gui instanceof GuiContainer) {
+            guiContainer = (GuiContainer) event.gui;
+        } else {
+            guiContainer = null;
+        }
 
+        if (Feature.LOCK_SLOTS.isEnabled() && guiContainer != null) {
             if (eventButton >= 0) {
                 /*
                 This prevents swapping items in/out of locked hotbar slots when using a hotbar key binding that is bound
@@ -193,12 +235,12 @@ public class GuiScreenListener {
                             return;
                         }
 
-                        if (main.getConfigValues().getLockedSlots().contains(i + 36)) {
+                        if (main.getPersistentValuesManager().getLockedSlots().contains(i + 36)) {
                             if (!slot.getHasStack() && !hotbarSlot.getHasStack()) {
                                 return;
                             } else {
                                 main.getUtils().playLoudSound("note.bass", 0.5);
-                                main.getUtils().sendMessage(main.getConfigValues().getRestrictedColor(Feature.DROP_CONFIRMATION) + Translations.getMessage("messages.slotLocked"));
+                                main.getUtils().sendMessage(Feature.DROP_CONFIRMATION.getRestrictedColor() + Translations.getMessage("messages.slotLocked"));
                                 event.setCanceled(true);
                             }
                         }
@@ -207,6 +249,13 @@ public class GuiScreenListener {
 
                 //TODO: Cover shift-clicking into locked slots
             }
+        }
+
+        ContainerPreviewManager.onContainerKeyTyped(eventButton);
+
+        // Copy NBT
+        if (guiContainer != null) {
+            this.onDeveloperKeyPressed(guiContainer);
         }
     }
 
@@ -237,12 +286,9 @@ public class GuiScreenListener {
         inventoryChangeListener = new InventoryChangeListener(this);
         inventory.addInventoryChangeListener(inventoryChangeListener);
         listenedInventory = inventory;
-        inventoryChangeTimeCheckTask = main.getNewScheduler().scheduleRepeatingTask(new SkyblockRunnable() {
-            @Override
-            public void run() {
-                checkLastInventoryChangeTime();
-            }
-        }, 20, 5);
+        inventoryChangeTimeCheckTask = main.getScheduler().scheduleTask(
+                scheduledTask -> checkLastInventoryChangeTime(), 20, 5
+        );
     }
 
     /**
@@ -301,16 +347,33 @@ public class GuiScreenListener {
         Pair<Integer, Integer> clickedButton = GuiContainerHook.getLastClickedButtonOnPetsMenu();
         if (clickedButton == null) return;
 
-        int index = clickedButton.getKey() + 45 * (main.getInventoryUtils().getInventoryPageNum() - 1);
+        int pageNum = main.getInventoryUtils().getInventoryPageNum();
+        // If pageNum == 0, there is no page indicator in the title, there is only 1 pet page.
+        int index = clickedButton.getLeft() + 45 * (pageNum == 0 ? 0 : pageNum -1);
+
         if (petMap.containsKey(index)) {
             PetManager.Pet pet = petMap.get(index);
             if (pet.getPetInfo().isActive()) {
                 main.getPetCacheManager().setCurrentPet(null);
-            } else if (clickedButton.getValue() != 1 /*right click*/) {
+            } else if (clickedButton.getRight() != 1 /*right click*/) {
                 main.getPetCacheManager().setCurrentPet(pet);
             }
             // lastClickedButton has completed its task, time to clean up
             GuiContainerHook.setLastClickedButtonOnPetsMenu(null);
+        }
+    }
+
+    private void onDeveloperKeyPressed(@NonNull GuiContainer guiContainer) {
+        if (Feature.DEVELOPER_MODE.isEnabled() && SkyblockKeyBinding.DEVELOPER_COPY_NBT.isPressed()) {
+            Slot currentSlot = guiContainer.getSlotUnderMouse();
+
+            if (currentSlot != null && currentSlot.getHasStack()) {
+                DevUtils.setCopyMode(DevUtils.CopyMode.ITEM);
+                DevUtils.copyNBTTagToClipboard(
+                        currentSlot.getStack().serializeNBT(),
+                        ColorCode.GREEN + "Item data was copied to clipboard!"
+                );
+            }
         }
     }
 }

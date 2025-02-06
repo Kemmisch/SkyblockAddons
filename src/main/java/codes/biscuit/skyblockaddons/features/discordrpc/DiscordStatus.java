@@ -2,44 +2,55 @@ package codes.biscuit.skyblockaddons.features.discordrpc;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
 import codes.biscuit.skyblockaddons.core.*;
-import codes.biscuit.skyblockaddons.gui.buttons.ButtonSelect;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
+import codes.biscuit.skyblockaddons.core.feature.FeatureSetting;
+import codes.biscuit.skyblockaddons.gui.buttons.ButtonCycling;
 import codes.biscuit.skyblockaddons.utils.EnumUtils;
 import codes.biscuit.skyblockaddons.utils.LocationUtils;
 import codes.biscuit.skyblockaddons.utils.TextUtils;
+import codes.biscuit.skyblockaddons.utils.objects.RegistrableEnum;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
-import org.apache.commons.lang3.mutable.MutableFloat;
 
-import java.util.Map;
 import java.util.function.Supplier;
 
 /**
  * Statuses that are shown on the Discord RPC feature
  */
 @SuppressWarnings("UnnecessaryUnicodeEscape")
-public enum DiscordStatus implements ButtonSelect.SelectItem {
+public enum DiscordStatus implements ButtonCycling.SelectItem, RegistrableEnum {
 
     NONE("discordStatus.titleNone", "discordStatus.descriptionNone", () -> null),
     LOCATION("discordStatus.titleLocation", "discordStatus.descriptionLocation",
             () -> {
                 SkyblockAddons main = SkyblockAddons.getInstance();
 
-                Location location = main.getUtils().getLocation();
-                String prefix = main.getUtils().isOnRift() ? "\u0444 " : "\u23E3 ";
+                String location = main.getUtils().getLocation();
+                Island map = main.getUtils().getMap();
+                String prefix = main.getUtils().isOnRift() ? "ф " : "⏣ ";
 
-                switch (location) {
-                    // Don't display "Your Island."
-                    case ISLAND:
-                        return "\u23E3 Private Island";
-                    case THE_CATACOMBS:
-                    case KUUDRAS_HOLLOW:
-                        return prefix.concat(location.getScoreboardName())
-                                .concat(main.getUtils().getDungeonFloor());
-                    case GARDEN_PLOT:
-                        return prefix.concat(location.getScoreboardName())
-                                .concat(main.getUtils().getPlotName());
+                switch (map) {
+                    // Don't display "Your Island"
+                    case PRIVATE_ISLAND:
+                        if (main.getUtils().isGuest()) {
+                            return "Visiting " + location.trim();
+                        } else {
+                            return "⏣ Private Island";
+                        }
+                    case GARDEN:
+                        // If the title line ends with "GUEST", then the player is visiting someone else's island.
+                        if (main.getUtils().isGuest()) {
+                            return "Visiting The Garden";
+                        } else {
+                            String display = prefix + location;
+                            String plotName = main.getUtils().getPlotName();
+                            if (!plotName.isEmpty()) {
+                                display += " - " + plotName;
+                            }
+                            return display;
+                        }
                     default:
-                        return prefix.concat(location.getScoreboardName());
+                        return prefix + location;
                 }
             }),
 
@@ -75,11 +86,9 @@ public enum DiscordStatus implements ButtonSelect.SelectItem {
 
     STATS("discordStatus.titleStats", "discordStatus.descriptionStats",
             () -> {
-                final Map<Attribute, MutableFloat> attributes = SkyblockAddons.getInstance().getUtils().getAttributes();
-
-                String health = TextUtils.formatNumber(attributes.get(Attribute.HEALTH).getValue());
-                String defense = TextUtils.formatNumber(attributes.get(Attribute.DEFENCE).getValue());
-                String mana = TextUtils.formatNumber(attributes.get(Attribute.MANA).getValue());
+                String health = TextUtils.formatNumber(PlayerStats.HEALTH.getValue());
+                String defense = TextUtils.formatNumber(PlayerStats.DEFENCE.getValue());
+                String mana = TextUtils.formatNumber(PlayerStats.MANA.getValue());
 
                 return String.format("%s\u2764 %s\u2748 %s\u270E", health, defense, mana);
             }),
@@ -113,35 +122,44 @@ public enum DiscordStatus implements ButtonSelect.SelectItem {
 
     CUSTOM("discordStatus.titleCustom", "discordStatus.descriptionCustom",
             () -> {
-                SkyblockAddons main = SkyblockAddons.getInstance();
+                FeatureSetting currentStatus = SkyblockAddons.getInstance().getDiscordRPCManager().getCurrentStatus();
 
-                String text = main.getConfigValues().getCustomStatus(main.getDiscordRPCManager().getCurrentEntry());
+                String text;
+                if (currentStatus != null) {
+                    text = Feature.DISCORD_RPC.getAsString(currentStatus);
+                } else {
+                    return "!!";
+                }
+
                 return text.substring(0, Math.min(text.length(), 100));
             }),
 
     AUTO_STATUS("discordStatus.titleAuto", "discordStatus.descriptionAuto", () -> {
                 SkyblockAddons main = SkyblockAddons.getInstance();
-                Location location = main.getUtils().getLocation();
-
-                if (location == Location.THE_END || location == Location.DRAGONS_NEST) {
-                    return DiscordStatus.ZEALOTS.displayMessageSupplier.get();
-                }
 
                 EnumUtils.SlayerQuest slayerQuest = main.getUtils().getSlayerQuest();
-                if (slayerQuest != null && LocationUtils.isSlayerLocation(slayerQuest, location)) {
+                if (slayerQuest != null && LocationUtils.isOnSlayerLocation(slayerQuest)) {
                     return (main.getUtils().isSlayerBossAlive() ? "Slaying a " : "Doing a ")
                             + slayerQuest.getScoreboardName() + " " + main.getUtils().getSlayerQuestLevel() + " boss.";
+                }
+
+                if (LocationUtils.isOnZealotSpawnLocation()) {
+                    return DiscordStatus.ZEALOTS.displayMessageSupplier.get();
                 }
 
                 if (main.getUtils().isOnRift()) {
                     return DiscordStatus.valueOf("MOTES").displayMessageSupplier.get();
                 }
 
-                if ("AUTO_STATUS".equals(main.getConfigValues().getDiscordAutoDefault().name())) { // Avoid self reference.
-                    main.getConfigValues().setDiscordAutoDefault(DiscordStatus.NONE);
+                Feature feature = Feature.DISCORD_RPC;
+
+                // Avoid self reference.
+                if ("AUTO_STATUS".equals(feature.getAsEnum(FeatureSetting.DISCORD_RP_AUTO_MODE).name())) {
+                    feature.set(FeatureSetting.DISCORD_RP_AUTO_MODE, DiscordStatus.NONE);
                 }
 
-                return main.getConfigValues().getDiscordAutoDefault().displayMessageSupplier.get();
+                DiscordStatus mode = (DiscordStatus) feature.getAsEnum(FeatureSetting.DISCORD_RP_AUTO_MODE);
+                return mode.displayMessageSupplier.get();
             })
     ;
 
@@ -155,13 +173,13 @@ public enum DiscordStatus implements ButtonSelect.SelectItem {
         this.displayMessageSupplier = displayMessageSupplier;
     }
 
-    public String getDisplayString(EnumUtils.DiscordStatusEntry currentEntry) {
-        SkyblockAddons.getInstance().getDiscordRPCManager().setCurrentEntry(currentEntry);
+    public String getDisplayString(FeatureSetting currentStatus) {
+        SkyblockAddons.getInstance().getDiscordRPCManager().setCurrentStatus(currentStatus);
         return displayMessageSupplier.get();
     }
 
     @Override
-    public String getName() {
+    public String getDisplayName() {
         return Translations.getMessage(title);
     }
 

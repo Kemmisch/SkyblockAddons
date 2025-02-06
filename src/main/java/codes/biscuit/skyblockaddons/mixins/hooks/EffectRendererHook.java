@@ -1,7 +1,7 @@
 package codes.biscuit.skyblockaddons.mixins.hooks;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
-import codes.biscuit.skyblockaddons.core.Feature;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.core.OverlayEffectRenderer;
 import codes.biscuit.skyblockaddons.features.fishParticles.FishParticleManager;
 import codes.biscuit.skyblockaddons.features.healingcircle.HealingCircleManager;
@@ -21,11 +21,9 @@ import net.minecraft.entity.player.EntityPlayer;
 import java.util.HashSet;
 import java.util.Set;
 
-
-
 public class EffectRendererHook {
 
-    private static Set<OverlayEffectRenderer> effectRenderers = new HashSet<>();
+    private static final Set<OverlayEffectRenderer> effectRenderers = new HashSet<>();
 
     public static void onAddParticle(EntityFX entity) {
         SkyblockAddons main = SkyblockAddons.getInstance();
@@ -33,10 +31,12 @@ public class EffectRendererHook {
         EntityPlayer player = mc.thePlayer;
 
         if (main.getUtils().isOnSkyblock()) {
-            if (main.getUtils().isInDungeon() && main.getConfigValues().isEnabled(Feature.SHOW_HEALING_CIRCLE_WALL) && entity instanceof EntityAuraFX && entity.posY % 1 == 0.0D) {
+            if (main.getUtils().isInDungeon() && Feature.SHOW_HEALING_CIRCLE_WALL.isEnabled()
+                    && entity instanceof EntityAuraFX && entity.posY % 1 == 0.0D) {
                 HealingCircleManager.addHealingCircleParticle(new HealingCircleParticle(entity.posX, entity.posZ));
             }
-            else if (player != null && player.fishEntity != null && main.getConfigValues().isEnabled(Feature.FISHING_PARTICLE_OVERLAY) && entity instanceof EntityFishWakeFX) {
+            else if (player != null && player.fishEntity != null && Feature.FISHING_PARTICLE_OVERLAY.isEnabled()
+                    && entity instanceof EntityFishWakeFX) {
                 FishParticleManager.onFishWakeSpawn((EntityFishWakeFX) entity);
             }
         }

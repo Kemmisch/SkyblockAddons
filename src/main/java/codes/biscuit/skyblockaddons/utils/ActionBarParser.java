@@ -2,6 +2,8 @@ package codes.biscuit.skyblockaddons.utils;
 
 import codes.biscuit.skyblockaddons.SkyblockAddons;
 import codes.biscuit.skyblockaddons.core.*;
+import codes.biscuit.skyblockaddons.core.feature.Feature;
+import codes.biscuit.skyblockaddons.core.feature.FeatureSetting;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -119,7 +121,7 @@ public class ActionBarParser {
 
         // If the action bar is displaying player stats and the defense section is absent, the player's defense is zero.
         if (actionBar.contains("❤") && !actionBar.contains("❈") && splitMessage.length == 2) {
-            setAttribute(Attribute.DEFENCE, 0);
+            PlayerStats.DEFENCE.setValue(0);
         }
 
         for (String section : splitMessage) {
@@ -200,7 +202,7 @@ public class ActionBarParser {
     }
 
     private String parseTrueDefence(String section) {
-        return main.getConfigValues().isEnabled(Feature.HIDE_TRUE_DEFENSE) ? null : section;
+        return Feature.HIDE_TRUE_DEFENSE.isEnabled() ? null : section;
 
     }
 
@@ -259,14 +261,13 @@ public class ActionBarParser {
     private String parseHealth(String healthSection) {
         // Normal:      §c1390/1390❤
         // With Wand:   §c1390/1390❤+§c30▅
-        final boolean separateDisplay = main.getConfigValues().isEnabled(Feature.HEALTH_BAR)
-                    || main.getConfigValues().isEnabled(Feature.HEALTH_TEXT);
+        final boolean separateDisplay = Feature.HEALTH_BAR.isEnabled() || Feature.HEALTH_TEXT.isEnabled();
         String returnString = healthSection;
         float newHealth;
         float maxHealth;
         String stripped = TextUtils.stripColor(healthSection);
         Matcher m = HEALTH_PATTERN_S.matcher(stripped);
-        if ((main.getConfigValues().isEnabled(Feature.EFFECTIVE_HEALTH_TEXT) || separateDisplay) && m.matches()) {
+        if ((Feature.EFFECTIVE_HEALTH_TEXT.isEnabled() || separateDisplay) && m.matches()) {
             newHealth = parseFloat(m.group("health"));
             maxHealth = parseFloat(m.group("maxHealth"));
             if (separateDisplay) {
@@ -280,10 +281,10 @@ public class ActionBarParser {
                 }
             }
             healthLock = false;
-            boolean postSetLock = main.getUtils().getAttributes().get(Attribute.MAX_HEALTH).getValue() != maxHealth ||
-                    (Math.abs(main.getUtils().getAttributes().get(Attribute.HEALTH).getValue() - newHealth) / maxHealth) > .05;
-            setAttribute(Attribute.HEALTH, newHealth);
-            setAttribute(Attribute.MAX_HEALTH, maxHealth);
+            boolean postSetLock = PlayerStats.MAX_HEALTH.getValue() != maxHealth
+                    || (Math.abs(PlayerStats.HEALTH.getValue() - newHealth) / maxHealth) > .05;
+            if (!healthLock) PlayerStats.HEALTH.setValue(newHealth);
+            PlayerStats.MAX_HEALTH.setValue(maxHealth);
             healthLock = postSetLock;
         }
         return returnString;
@@ -301,15 +302,15 @@ public class ActionBarParser {
         // 421/421✎ -10ʬ
         Matcher m = MANA_PATTERN_S.matcher(TextUtils.stripColor(manaSection).trim());
         if (m.matches()) {
-            setAttribute(Attribute.MANA, parseFloat(m.group("num")));
-            setAttribute(Attribute.MAX_MANA, parseFloat(m.group("den")));
+            PlayerStats.MANA.setValue(parseFloat(m.group("num")));
+            PlayerStats.MAX_MANA.setValue(parseFloat(m.group("den")));
             float overflowMana = 0;
             if (m.group("overflow") != null) {
                 overflowMana = parseFloat(m.group("overflow"));
             }
-            setAttribute(Attribute.OVERFLOW_MANA, overflowMana);
+            PlayerStats.OVERFLOW_MANA.setValue(overflowMana);
             main.getRenderListener().setPredictMana(false);
-            if (main.getConfigValues().isEnabled(Feature.MANA_BAR) || main.getConfigValues().isEnabled(Feature.MANA_TEXT)) {
+            if (Feature.MANA_BAR.isEnabled() || Feature.MANA_TEXT.isEnabled()) {
                 return null;
             }
         }
@@ -331,9 +332,9 @@ public class ActionBarParser {
         Matcher m = DEFENSE_PATTERN_S.matcher(stripped);
         if (m.matches()) {
             float defense = parseFloat(m.group("defense"));
-            setAttribute(Attribute.DEFENCE, defense);
+            PlayerStats.DEFENCE.setValue(defense);
             otherDefense = TextUtils.getFormattedString(defenseSection, m.group("other").trim());
-            if (main.getConfigValues().isEnabled(Feature.DEFENCE_TEXT) || main.getConfigValues().isEnabled(Feature.DEFENCE_PERCENTAGE)) {
+            if (Feature.DEFENCE_TEXT.isEnabled() || Feature.DEFENCE_PERCENTAGE.isEnabled()) {
                 return null;
             }
         }
@@ -362,7 +363,7 @@ public class ActionBarParser {
      * @return {@code null} or {@code skillSection} if wrong format or skill display is disabled
      */
     private String parseSkill(String skillSection) throws ParseException {
-        if (main.getConfigValues().isEnabled(Feature.SKILL_DISPLAY) || main.getConfigValues().isEnabled(Feature.SKILL_PROGRESS_BAR)) {
+        if (Feature.SKILL_DISPLAY.isEnabled() || Feature.SKILL_PROGRESS_BAR.isEnabled()) {
             Matcher matcher = SKILL_GAIN_PATTERN_S.matcher(TextUtils.stripColor(skillSection));
             NumberFormat nf = NumberFormat.getInstance(Locale.US);
             StringBuilder skillTextBuilder = new StringBuilder();
@@ -375,7 +376,7 @@ public class ActionBarParser {
                 skillType = lastSkillType;
             } else if (matcher.matches()) {
 
-                if (main.getConfigValues().isEnabled(Feature.SHOW_SKILL_XP_GAINED)) {
+                if (Feature.SKILL_DISPLAY.isEnabled(FeatureSetting.SHOW_SKILL_XP_GAINED)) {
                     skillTextBuilder.append("+").append(matcher.group("gained"));
                 }
 
@@ -401,7 +402,7 @@ public class ActionBarParser {
                 percent = Math.min(100, percent);
 
 
-                if (!parseCurrAndTotal || main.getConfigValues().isEnabled(Feature.SHOW_SKILL_PERCENTAGE_INSTEAD_OF_XP)) {
+                if (!parseCurrAndTotal || Feature.SKILL_DISPLAY.isEnabled(FeatureSetting.SHOW_SKILL_PERCENTAGE_INSTEAD_OF_XP)) {
                     // We may only have the percent at this point
                     skillTextBuilder.append(" (").append(String.format("%.2f", percent)).append("%)");
                 } else {
@@ -410,7 +411,7 @@ public class ActionBarParser {
                     // Only print the total when it doesn't = 0
                     if (totalSkillXP != 0) {
                         skillTextBuilder.append("/");
-                        if (main.getConfigValues().isEnabled(Feature.ABBREVIATE_SKILL_XP_DENOMINATOR)) {
+                        if (Feature.SKILL_DISPLAY.isEnabled(FeatureSetting.ABBREVIATE_SKILL_XP_DENOMINATOR)) {
                             skillTextBuilder.append(TextUtils.abbreviate(totalSkillXP));
                         } else {
                             skillTextBuilder.append(nf.format(totalSkillXP));
@@ -420,7 +421,7 @@ public class ActionBarParser {
                 }
 
                 // This feature is only accessible when we have parsed the current and total skill xp
-                if (parseCurrAndTotal && main.getConfigValues().isEnabled(Feature.SKILL_ACTIONS_LEFT_UNTIL_NEXT_LEVEL)) {
+                if (parseCurrAndTotal && Feature.SKILL_DISPLAY.isEnabled(FeatureSetting.SKILL_ACTIONS_LEFT_UNTIL_NEXT_LEVEL)) {
                     float gained = nf.parse(matcher.group("gained")).floatValue();
 
                     skillTextBuilder.append(" - ");
@@ -443,7 +444,7 @@ public class ActionBarParser {
                 main.getRenderListener().setSkillText(skillTextBuilder.toString());
                 main.getRenderListener().setSkill(skillType);
                 main.getRenderListener().setSkillFadeOutTime(System.currentTimeMillis() + 4000);
-                if (main.getConfigValues().isEnabled(Feature.SKILL_DISPLAY)) {
+                if (Feature.SKILL_DISPLAY.isEnabled()) {
                     return null;
                 }
             }
@@ -483,7 +484,7 @@ public class ActionBarParser {
                 maxTickers++;
             }
         }
-        if (main.getConfigValues().isEnabled(Feature.TICKER_CHARGES_DISPLAY)) {
+        if (Feature.TICKER_CHARGES_DISPLAY.isEnabled()) {
             return null;
         } else {
             return tickerSection;
@@ -502,9 +503,9 @@ public class ActionBarParser {
         // splitStats should convert into [1798, 3000]
         int fuel = Math.max(0, Integer.parseInt(splitStats[0]));
         int maxFuel = Math.max(1, Integer.parseInt(splitStats[1]));
-        setAttribute(Attribute.FUEL, fuel);
-        setAttribute(Attribute.MAX_FUEL, maxFuel);
-        if (main.getConfigValues().isEnabled(Feature.DRILL_FUEL_BAR) || main.getConfigValues().isEnabled(Feature.DRILL_FUEL_TEXT)) {
+        PlayerStats.FUEL.setValue(fuel);
+        PlayerStats.MAX_FUEL.setValue(maxFuel);
+        if (Feature.DRILL_FUEL_BAR.isEnabled() || Feature.DRILL_FUEL_TEXT.isEnabled()) {
             return null;
         } else {
             return drillSection;
@@ -525,15 +526,4 @@ public class ActionBarParser {
         }
     }
 
-    /**
-     * Sets an attribute in {@link Utils}
-     * Ignores health if it's locked
-     *
-     * @param attribute Attribute
-     * @param value     Attribute value
-     */
-    private void setAttribute(Attribute attribute, float value) {
-        if (attribute == Attribute.HEALTH && healthLock) return;
-        main.getUtils().getAttributes().get(attribute).setValue(value);
-    }
 }

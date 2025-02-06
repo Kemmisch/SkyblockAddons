@@ -49,7 +49,7 @@
       "nbtName": "caster"
     },
     "cayenne": {
-      "goodLevel": 4,
+      "goodLevel": 0,
       "loreName": "Cayenne",
       "maxLevel": 5,
       "nbtName": "cayenne"
@@ -270,6 +270,12 @@
       "maxLevel": 2,
       "nbtName": "knockback"
     },
+    "lapidary": {
+      "goodLevel": 0,
+      "loreName": "Lapidary",
+      "maxLevel": 5,
+      "nbtName": "lapidary"
+    },
     "lethality": {
       "goodLevel": 5,
       "loreName": "Lethality",
@@ -339,7 +345,7 @@
     "pesterminator": {
       "goodLevel": 0,
       "loreName": "Pesterminator",
-      "maxLevel": 5,
+      "maxLevel": 6,
       "nbtName": "pesterminator"
     },
     "piercing": {
@@ -360,9 +366,9 @@
       "maxLevel": 7,
       "nbtName": "power"
     },
-    "pristine": {
+    "prismatic": {
       "goodLevel": 0,
-      "loreName": "Pristine",
+      "loreName": "Prismatic",
       "maxLevel": 5,
       "nbtName": "pristine"
     },
@@ -379,7 +385,7 @@
       "nbtName": "PROSECUTE"
     },
     "prosperity": {
-      "goodLevel": 4,
+      "goodLevel": 0,
       "loreName": "Prosperity",
       "maxLevel": 5,
       "nbtName": "prosperity"
@@ -397,7 +403,7 @@
       "nbtName": "punch"
     },
     "quantum": {
-      "goodLevel": 4,
+      "goodLevel": 0,
       "loreName": "Quantum",
       "maxLevel": 5,
       "nbtName": "quantum"
@@ -441,7 +447,7 @@
     "scavenger": {
       "goodLevel": 3,
       "loreName": "Scavenger",
-      "maxLevel": 5,
+      "maxLevel": 6,
       "nbtName": "scavenger"
     },
     "sharpness": {
@@ -547,7 +553,7 @@
       "nbtName": "titan_killer"
     },
     "transylvanian": {
-      "goodLevel": 4,
+      "goodLevel": 0,
       "loreName": "Transylvanian",
       "maxLevel": 5,
       "nbtName": "transylvanian"
@@ -807,6 +813,12 @@
       "loreName": "Flash",
       "maxLevel": 5,
       "nbtName": "ultimate_flash"
+    },
+    "flowstate": {
+      "goodLevel": 0,
+      "loreName": "Flowstate",
+      "maxLevel": 3,
+      "nbtName": "ultimate_flowstate"
     },
     "habanero tactics": {
       "goodLevel": 0,

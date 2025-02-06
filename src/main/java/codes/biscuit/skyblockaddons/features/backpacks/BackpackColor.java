@@ -4,8 +4,7 @@ import java.awt.*;
 import java.util.EnumSet;
 import java.util.Set;
 
-public enum  BackpackColor {
-
+public enum BackpackColor {
     BLACK(29,29,33),
     RED(176,46,38),
     GREEN(94,124,22),
@@ -21,11 +20,11 @@ public enum  BackpackColor {
     LIGHT_BLUE(58,179,218),
     MAGENTA(199,78,189),
     ORANGE(249,128,29),
-    WHITE(255,255,255);
+    DEFAULT(255,255,255);
 
-    private int r;
-    private int g;
-    private int b;
+    private final int r;
+    private final int g;
+    private final int b;
 
     BackpackColor(int r, int g, int b) {
         this.r = r;
@@ -34,19 +33,20 @@ public enum  BackpackColor {
     }
 
     public float getR() {
-        return (float)r/255;
+        return r/255F;
     }
 
     public float getG() {
-        return (float)g/255;
+        return g/255F;
     }
 
     public float getB() {
-        return (float)b/255;
+        return b/255F;
     }
 
-    private static Set<BackpackColor> darkColors = EnumSet.of(BackpackColor.BLACK, BackpackColor.PURPLE, BackpackColor.GREEN,
-            BackpackColor.MAGENTA, BackpackColor.RED, BackpackColor.BROWN, BackpackColor.BLUE, BackpackColor.GREY);
+    private static final Set<BackpackColor> darkColors = EnumSet.of(BackpackColor.BLACK, BackpackColor.PURPLE,
+            BackpackColor.GREEN, BackpackColor.MAGENTA, BackpackColor.RED, BackpackColor.BROWN, BackpackColor.BLUE,
+            BackpackColor.GREY);
 
     public int getInventoryTextColor() {
         int rgb = 4210752; // Default inventory grey.

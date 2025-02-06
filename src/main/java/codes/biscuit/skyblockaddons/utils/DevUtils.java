@@ -3,6 +3,7 @@ package codes.biscuit.skyblockaddons.utils;
 import codes.biscuit.skyblockaddons.SkyblockAddons;
 import codes.biscuit.skyblockaddons.asm.SkyblockAddonsASMTransformer;
 import codes.biscuit.skyblockaddons.core.Translations;
+import codes.biscuit.skyblockaddons.core.SkyblockKeyBinding;
 import codes.biscuit.skyblockaddons.utils.data.DataUtils;
 import lombok.Getter;
 import lombok.Setter;
@@ -31,7 +32,6 @@ import net.minecraft.world.WorldType;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.client.FMLClientHandler;
 import org.apache.logging.log4j.Logger;
-import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
 import java.awt.*;
@@ -49,9 +49,6 @@ import java.util.stream.Collectors;
 
 /**
  * This is a class of utilities for SkyblockAddons developers.
- *
- * @author ILikePlayingGames
- * @version 2.3
  */
 public class DevUtils {
     //TODO: Add options to enter custom action bar messages to test ActionBarParser
@@ -72,8 +69,9 @@ public class DevUtils {
     private static final boolean DEFAULT_SIDEBAR_FORMATTED = false;
 
     @Getter @Setter private static boolean loggingActionBarMessages = false;
-    @Getter @Setter private static  boolean loggingSlayerTrackerMessages = false;
-    private static CopyMode copyMode = CopyMode.ENTITY;
+    @Getter @Setter private static boolean loggingSlayerTracker = false;
+    @Getter @Setter private static boolean loggingSkyBlockOre = false;
+    @Getter private static CopyMode copyMode = CopyMode.ENTITY;
     private static List<Class<? extends Entity>> entityNames = DEFAULT_ENTITY_NAMES;
     private static int entityCopyRadius = DEFAULT_ENTITY_COPY_RADIUS;
     @Setter private static boolean sidebarFormatted = DEFAULT_SIDEBAR_FORMATTED;
@@ -125,8 +123,10 @@ public class DevUtils {
         }
 
         // Remove scores that aren't rendered.
-        scores = scores.stream().filter(input -> input.getPlayerName() != null && !input.getPlayerName().startsWith("#"))
-                .skip(Math.max(scores.size() - 15, 0)).collect(Collectors.toList());
+        scores = scores.stream()
+                .filter(input -> input.getPlayerName() != null && !input.getPlayerName().startsWith("#"))
+                .skip(Math.max(scores.size() - 15, 0))
+                .collect(Collectors.toList());
 
         /*
         Minecraft renders the scoreboard from bottom to top so to keep the same order when writing it from top
@@ -330,7 +330,6 @@ public class DevUtils {
 
     /**
      * Copies the header and footer of the tab player list to the clipboard
-     *
      * @see net.minecraft.client.gui.GuiPlayerTabOverlay
      */
     public static void copyTabListHeaderAndFooter() {
@@ -350,7 +349,7 @@ public class DevUtils {
             output.append("\n\n");
         }
 
-        if (tabHeader != null) {
+        if (tabFooter != null) {
             output.append("Footer:").append("\n");
             output.append(tabFooter.getFormattedText());
         }
@@ -446,8 +445,6 @@ public class DevUtils {
         writeToClipboard(prettyPrintNBT(nbt), ColorCode.GREEN + "Successfully copied the block data!");
     }
 
-
-    // FIXME add support for TAG_LONG_ARRAY when updating to 1.12
     /**
      * <p>Converts an NBT tag into a pretty-printed string.</p>
      * <p>For constant definitions, see {@link Constants.NBT}</p>
@@ -572,19 +569,22 @@ public class DevUtils {
      * This method reloads all of the mod's settings from the settings file.
      */
     public static void reloadConfig() {
-        logger.info("Reloading settings...");
-        main.getConfigValues().loadValues();
-        logger.info("Settings reloaded");
+        sendMessageOrLog("Reloading settings...");
+        main.getConfigValuesManager().loadValues();
+        sendMessageOrLog("Settings reloaded.");
     }
 
     /**
      * This method reloads all of the mod's resources from the corresponding files.
      */
     public static void reloadResources() {
-        logger.info("Reloading resources...");
+        sendMessageOrLog(Translations.getMessage("messages.reloadingResources"));
+        DataUtils.registerNewRemoteRequests();
         DataUtils.readLocalAndFetchOnline();
         main.getPersistentValuesManager().loadValues();
-        ((SimpleReloadableResourceManager) mc.getResourceManager()).reloadResourcePack(FMLClientHandler.instance().getResourcePackFor(SkyblockAddons.MOD_ID));
+        ((SimpleReloadableResourceManager) mc.getResourceManager()).reloadResourcePack(
+                FMLClientHandler.instance().getResourcePackFor(SkyblockAddons.MOD_ID)
+        );
         try {
             Method notifyReloadListenersMethod = SimpleReloadableResourceManager.class.getDeclaredMethod(
                     SkyblockAddonsASMTransformer.isDeobfuscated() ? "notifyReloadListeners" : "func_110544_b"
@@ -594,7 +594,13 @@ public class DevUtils {
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
             logger.error("An error occurred while reloading the mod's resources.", e);
         }
-        logger.info("Resources reloaded");
+        SkyblockAddons.getInstance().getScheduler().scheduleAsyncTask(scheduledTask -> {
+            if (DataUtils.getExecutionServiceMetrics().getActiveConnectionCount() == 0) {
+                DataUtils.onSkyblockJoined();
+                sendMessageOrLog(Translations.getMessage("messages.resourcesReloaded"));
+                scheduledTask.cancel();
+            }
+        }, 0, 2);
     }
 
     /*
@@ -624,11 +630,17 @@ public class DevUtils {
             DevUtils.copyMode = copyMode;
             main.getUtils().sendMessage(
                     ColorCode.YELLOW + Translations.getMessage(
-                            "messages.copyModeSet",
-                            copyMode,
-                            Keyboard.getKeyName(main.getDeveloperCopyNBTKey().getKeyCode())
+                            "messages.copyModeSet", copyMode, SkyblockKeyBinding.DEVELOPER_COPY_NBT.getKeyName()
                     )
             );
+        }
+    }
+
+    private static void sendMessageOrLog(String message) {
+        if (mc.thePlayer != null) {
+            main.getUtils().sendMessage(message);
+        } else {
+            logger.info(message);
         }
     }
 
