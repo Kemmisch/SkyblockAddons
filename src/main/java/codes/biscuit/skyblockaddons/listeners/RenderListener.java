@@ -2916,7 +2916,7 @@ public class RenderListener {
         } else {
             // TODO x -= dummyWidth / 2 * scale (Feature refactor)
             // TODO allignment to right edge of screen
-            // x -= width * scale;
+            x -= width * scale;
         }
         x = Math.round(x * minecraftScale) / minecraftScale;
         return x / scale;
