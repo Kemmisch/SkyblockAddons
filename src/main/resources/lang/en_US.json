@@ -235,6 +235,7 @@
     "infernoSlayerTracker": "Slayer Tracker - Inferno/Blaze",
     "riftstalkerSlayerTracker": "Slayer Tracker - Riftstalker/Vampire",
     "expandDeployableStatus": "Show stats in 2 columns on detailed status",
+    "showOnlyHoldingMiningTool": "Show only when holding a mining tool",
     "showOnlyHoldingFishingRod": "Show only when holding a fishing rod",
     "hideHealthThingsOnRift": "Don't show while in Rift Dimension",
     "hideOnlyOutsideRift": "Hide only outside Rift Dimension",
@@ -354,7 +355,8 @@
     "locationEditGui": {
       "atOpening": "TIP: You can adjust the scaling with the mouse wheel and increase the ratio by holding Shift. With right mouse click you can change the scale of that feature to default. You can also move the hovered feature with the WASD or arrow keys. You can also open the settings by hovering your mouse over the feature you want to open the settings for and clicking the mouse wheel button."
     },
-    "classColoredTeammateRequirement": "Entity Outlines and Outline Dungeon Teammate features must be enabled"
+    "classColoredTeammateRequirement": "Entity Outlines and Outline Dungeon Teammate features must be enabled",
+    "perkpocalypseUnknown": "Mayor Jerry's Perkpocalypse mayor is not known! Click here to update Perkpocalypse mayor."
   },
   "discordStatus": {
     "titleNone": "None",

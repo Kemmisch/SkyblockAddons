@@ -26,12 +26,12 @@ public class HealingCircleManager {
         for (HealingCircle healingCircle : healingCircles) {
             if (healingCircle.hasCachedCenterPoint()) {
                 Point2D.Double circleCenter = healingCircle.getCircleCenter();
-                if (healingCircleParticle.getPoint().distance(circleCenter.getX(), circleCenter.getY()) < (HealingCircle.DIAMETER + 2) / 2F) {
+                if (healingCircleParticle.getPoint().distance(circleCenter.getX(), circleCenter.getY()) < (HealingCircle.getDiameter() + 2) / 2F) {
                     nearbyHealingCircle = healingCircle;
                     break;
                 }
             } else {
-                if (healingCircleParticle.getPoint().distance(healingCircle.getAverageX(), healingCircle.getAverageZ()) < HealingCircle.DIAMETER + 2) {
+                if (healingCircleParticle.getPoint().distance(healingCircle.getAverageX(), healingCircle.getAverageZ()) < HealingCircle.getDiameter() + 2) {
                     nearbyHealingCircle = healingCircle;
                     break;
                 }
@@ -82,7 +82,7 @@ public class HealingCircleManager {
                                     )
                             )
                     );
-                    DrawUtils.drawCylinder(circleCenter.getX(), 0, circleCenter.getY(), HealingCircle.RADIUS, 255, ColorUtils.getDummySkyblockColor(color, chroma));
+                    DrawUtils.drawCylinder(circleCenter.getX(), 0, circleCenter.getY(), HealingCircle.getRadius(), 255, ColorUtils.getDummySkyblockColor(color, chroma));
 
                     GlStateManager.enableCull();
                     GlStateManager.enableTexture2D();

@@ -134,7 +134,7 @@ public class SkyblockAddons {
 
     @Setter private OnlineData onlineData;
     @Setter private ElectionData electionData;
-    @Setter private MayorJerryData mayorJerryData;
+    private final MayorJerryData mayorJerryData;
 
     private boolean usingLabymod;
     private boolean usingOofModv1;
@@ -156,7 +156,9 @@ public class SkyblockAddons {
         dungeonManager = new DungeonManager();
         discordRPCManager = new DiscordRPCManager();
         skillXpManager = new SkillXpManager();
+
         electionData = new ElectionData();
+        mayorJerryData = new MayorJerryData();
     }
 
     @Mod.EventHandler
