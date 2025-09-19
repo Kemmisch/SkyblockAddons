@@ -12,6 +12,7 @@ import codes.biscuit.skyblockaddons.utils.ColorCode;
 import codes.biscuit.skyblockaddons.utils.ColorUtils;
 import codes.biscuit.skyblockaddons.utils.EnumUtils;
 import codes.biscuit.skyblockaddons.utils.EnumUtils.AnchorPoint;
+import codes.biscuit.skyblockaddons.utils.Utils;
 import codes.biscuit.skyblockaddons.utils.objects.Pair;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -20,15 +21,12 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
-import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.crash.CrashReport;
 import net.minecraft.util.ReportedException;
 import org.apache.logging.log4j.Logger;
 
-import java.awt.geom.Point2D;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -65,7 +63,7 @@ public class ConfigValuesManager {
     @Deprecated private final File legacyConfigFile; // TODO remove in future
 
     /** Do not make direct changes! If you are using mutable objects, make a deep copy. */
-    private final EnumMap<Feature, FeatureData<?>> DEFAULT_FEATURE_DATA = new EnumMap<>(Feature.class);
+    public static final EnumMap<Feature, FeatureData<?>> DEFAULT_FEATURE_DATA = new EnumMap<>(Feature.class);
 
     @Setter private boolean firstLoad = true;
 
@@ -89,8 +87,20 @@ public class ConfigValuesManager {
         this.legacyConfigFile = new File(mainConfigDir, "skyblockaddons.cfg");
     }
 
-    // TODO migration map for Feature rework, remove in feature
-    @Deprecated @Getter private static TreeMap<Feature, TreeMap<FeatureSetting, Integer>> migrationMap = null;
+    /**
+     * Contains the information required to bind to the specified Feature as FeatureSetting.
+     * The Feature to be deprecated is defined as a FeatureSetting, preserving its value to the specified parent Feature.
+     * <pre>
+     * "parentFeature": {
+     *   "newFeatureSetting": legacyFeatureId,
+     *   ...
+     * }
+     * </pre>
+     * @see #loadValues()
+     * @deprecated Written to migrate CONFIG_VERSION 10 and earlier to 11.
+     */
+    @Deprecated
+    private static TreeMap<Feature, TreeMap<FeatureSetting, Integer>> migrationMap = null;
 
     public void loadValues() {
         Gson gson = SkyblockAddons.getGson();
@@ -468,7 +478,7 @@ public class ConfigValuesManager {
 //                    DataUtils.getFailedRequests().put("configurations.json", ex); // TODO in-game error alerts
 
                     // Backup then restore defaults.
-                    backupConfig();
+                    backupConfig(true);
                     addDefaultsAndSave();
                 } else {
                     LOGGER.error("Error loading configuration values!", ex);
@@ -490,6 +500,14 @@ public class ConfigValuesManager {
     }
 
     private void overwriteFeatureData() {
+        if (firstLoad) {
+            // If the feature does not have any FeatureData, put the default FeatureData
+            // It can be a new Feature or a manually edited Feature
+            for (Feature feature : Feature.values()) {
+                configValues.features.computeIfAbsent(feature, k -> DEFAULT_FEATURE_DATA.get(k).deepCopy());
+            }
+        }
+
         for (Map.Entry<Feature, FeatureData<?>> entry : configValues.features.entrySet()) {
             Feature feature = entry.getKey();
             FeatureData<?> featureData = entry.getValue();
@@ -577,7 +595,7 @@ public class ConfigValuesManager {
             } catch (Exception ex) {
                 LOGGER.error("Error saving configurations file!", ex);
                 if (Minecraft.getMinecraft().thePlayer != null) {
-                    SkyblockAddons.getInstance().getUtils().sendErrorMessage(
+                    Utils.sendErrorMessage(
                             "Error saving configurations file! Check log for more detail."
                     );
                 }
@@ -660,7 +678,7 @@ public class ConfigValuesManager {
         }
     }
 
-    private void putDefaultCoordinates(Feature feature) {
+    public void putDefaultCoordinates(Feature feature) {
         Pair<Float, Float> coords = DEFAULT_FEATURE_DATA.get(feature).getCoords().clonePair();
         if (coords != null) {
             feature.getFeatureData().setCoords(coords);
@@ -681,67 +699,6 @@ public class ConfigValuesManager {
         feature.setGuiScale(defaultScale);
     }
 
-    public float getActualX(Feature feature) {
-        int maxX = new ScaledResolution(Minecraft.getMinecraft()).getScaledWidth();
-        return getAnchorPoint(feature).getX(maxX) + getRelativeCoords(feature).getLeft();
-    }
-
-    public float getActualY(Feature feature) {
-        int maxY = new ScaledResolution(Minecraft.getMinecraft()).getScaledHeight();
-        return getAnchorPoint(feature).getY(maxY) + getRelativeCoords(feature).getRight();
-    }
-
-    public Pair<Float, Float> getRelativeCoords(Feature feature) {
-        Pair<Float, Float> coords = feature.getFeatureData().getCoords();
-        if (coords != null) {
-            return coords;
-        } else {
-            putDefaultCoordinates(feature);
-            coords = feature.getFeatureData().getCoords();
-            if (coords != null) {
-                return coords;
-            } else {
-                return new Pair<>(0F, 0F);
-            }
-        }
-    }
-
-    public void setClosestAnchorPoint(Feature feature) {
-        float x1 = getActualX(feature);
-        float y1 = getActualY(feature);
-        ScaledResolution sr = new ScaledResolution(Minecraft.getMinecraft());
-        int maxX = sr.getScaledWidth();
-        int maxY = sr.getScaledHeight();
-        double shortestDistance = -1;
-        AnchorPoint closestAnchorPoint = AnchorPoint.BOTTOM_MIDDLE; // default
-        for (AnchorPoint point : AnchorPoint.values()) {
-            double distance = Point2D.distance(x1, y1, point.getX(maxX), point.getY(maxY));
-            if (shortestDistance == -1 || distance < shortestDistance) {
-                closestAnchorPoint = point;
-                shortestDistance = distance;
-            }
-        }
-        if (this.getAnchorPoint(feature) == closestAnchorPoint) {
-            return;
-        }
-        float targetX = getActualX(feature);
-        float targetY = getActualY(feature);
-        float x = targetX-closestAnchorPoint.getX(maxX);
-        float y = targetY-closestAnchorPoint.getY(maxY);
-        feature.getFeatureData().setAnchorPoint(closestAnchorPoint);
-        feature.getFeatureData().setCoords(x, y);
-    }
-
-    public AnchorPoint getAnchorPoint(Feature feature) {
-        AnchorPoint anchorPoints = feature.getFeatureData().getAnchorPoint();
-        if (anchorPoints != null) {
-            return anchorPoints;
-        } else {
-            anchorPoints = DEFAULT_FEATURE_DATA.get(feature).getAnchorPoint();
-            return anchorPoints == null ? AnchorPoint.BOTTOM_MIDDLE : anchorPoints;
-        }
-    }
-
     /**
      * @return deep copy of {@code DEFAULT_FEATURE_DATA}
      */
@@ -754,7 +711,7 @@ public class ConfigValuesManager {
     /**
      * Creates backup of 'configurations.json'
      */
-    public void backupConfig() {
+    public void backupConfig(boolean corrupted) {
         if (!settingsConfigFile.exists()) {
             LOGGER.warn("configurations.json file for backup is not exist!");
             return;
@@ -762,7 +719,8 @@ public class ConfigValuesManager {
         try {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm");
             String formattedDate = ZonedDateTime.now().format(formatter);
-            String backupFileName = "configurations.json." + formattedDate + ".backup";
+            String extension = corrupted ? ".corrupted" : ".backup";
+            String backupFileName = "configurations.json." + formattedDate + extension;
 
             File backupFile = new File(configFile, "/skyblockaddons/backup/" + backupFileName);
             Files.createDirectories(backupFile.getParentFile().toPath());

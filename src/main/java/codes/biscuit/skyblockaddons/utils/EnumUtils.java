@@ -14,6 +14,10 @@ import java.net.URISyntaxException;
 import java.util.EnumSet;
 import java.util.Set;
 
+/**
+ * @implNote If you are going to register an enum value for a FeatureData 'value', use a unique name. Enums with the same
+ * name in different enum classes that use the RegistrableEnum interface will also cause problems with deserialization.
+ */
 public class EnumUtils {
 
     @SuppressWarnings("unused")
@@ -204,6 +208,33 @@ public class EnumUtils {
         }
     }
 
+    public enum AutoUpdateMode implements ButtonCycling.SelectItem, RegistrableEnum {
+        UPDATE_OFF("settings.autoUpdate.disabled.title", "settings.autoUpdate.disabled.description"),
+        STABLE("settings.autoUpdate.stable.title", "settings.autoUpdate.stable.description"),
+        LATEST("settings.autoUpdate.latest.title", "settings.autoUpdate.latest.description");
+
+        private final String TRANSLATION_KEY;
+        private final String DESCRIPTION_KEY;
+
+        AutoUpdateMode(String translationKey, String descriptionKey) {
+            TRANSLATION_KEY = translationKey;
+            DESCRIPTION_KEY = descriptionKey;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return Translations.getMessage(TRANSLATION_KEY);
+        }
+
+        @Override
+        public String getDescription() {
+            if (DESCRIPTION_KEY != null) {
+                return Translations.getMessage(DESCRIPTION_KEY);
+            }
+            return null;
+        }
+    }
+
     /**
      * If you make a feature, feel free to add your name here with an associated website of your choice.
      */
@@ -297,7 +328,7 @@ public class EnumUtils {
     @Getter
     public enum Social {
         GITHUB("github", "https://github.com/Fix3dll/SkyblockAddons"),
-        MODRINTH("modrinth", "https://modrinth.com/mod/skyblockaddons-unofficial"),
+        MODRINTH("modrinth", "https://modrinth.com/project/F35D4vTL"),
         BUYMEACOFFEE("buymeacoffee", "https://www.buymeacoffee.com/fix3dll");
 
         private final ResourceLocation resourceLocation;

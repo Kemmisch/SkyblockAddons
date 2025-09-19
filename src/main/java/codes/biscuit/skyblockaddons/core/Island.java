@@ -25,6 +25,8 @@ public enum Island {
     KUUDRA("Kuudra", "kuudra"),
     MINESHAFT("Mineshaft", "mineshaft"),
     DARK_AUCTION("Dark Auction", "dark_auction"),
+    BACKWATER_BAYOU("Backwater Bayou", "fishing_1"),
+    GALATEA("Galatea", "foraging_2"),
     UNKNOWN("null","null")
     ;
 

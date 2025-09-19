@@ -29,12 +29,13 @@ import codes.biscuit.skyblockaddons.gui.screens.IslandWarpGui;
 import codes.biscuit.skyblockaddons.gui.screens.LocationEditGui;
 import codes.biscuit.skyblockaddons.gui.screens.SettingsGui;
 import codes.biscuit.skyblockaddons.gui.screens.SkyblockAddonsGui;
-import codes.biscuit.skyblockaddons.core.Updater;
+import codes.biscuit.skyblockaddons.core.updater.Updater;
 import codes.biscuit.skyblockaddons.core.scheduler.ScheduledTask;
 import codes.biscuit.skyblockaddons.mixins.hooks.FontRendererHook;
 import codes.biscuit.skyblockaddons.shader.ShaderManager;
 import codes.biscuit.skyblockaddons.shader.chroma.ChromaScreenTexturedShader;
 import codes.biscuit.skyblockaddons.utils.*;
+import codes.biscuit.skyblockaddons.utils.EnumUtils.AutoUpdateMode;
 import codes.biscuit.skyblockaddons.utils.EnumUtils.DeployableDisplayStyle;
 import codes.biscuit.skyblockaddons.utils.EnumUtils.PetItemStyle;
 import com.mojang.authlib.GameProfile;
@@ -46,6 +47,8 @@ import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.*;
+import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
@@ -87,6 +90,7 @@ public class RenderListener {
 
     private static final SkyblockAddons main = SkyblockAddons.getInstance();
     private static final Minecraft MC = Minecraft.getMinecraft();
+    public static final ICamera CAMERA = new Frustum();
 
     private static final ItemStack BONE_ITEM = new ItemStack(Items.bone);
     private static final ResourceLocation BARS = new ResourceLocation("skyblockaddons", "barsV2.png");
@@ -169,6 +173,7 @@ public class RenderListener {
     @Getter @Setter private boolean predictMana;
 
     @Setter private boolean updateMessageDisplayed;
+    private ScheduledTask updateMessageDisplayTask;
 
     private Feature subtitleFeature;
     @Getter private Feature titleFeature;
@@ -526,8 +531,8 @@ public class RenderListener {
 
         if (fill > 1) fill = 1;
 
-        float x = main.getConfigValuesManager().getActualX(feature);
-        float y = main.getConfigValuesManager().getActualY(feature);
+        float x = feature.getActualX();
+        float y = feature.getActualY();
         float scaleX = feature.getFeatureData().getSizesX();
         float scaleY = feature.getFeatureData().getSizesY();
         GlStateManager.scale(scaleX, scaleY, 1);
@@ -683,38 +688,43 @@ public class RenderListener {
      */
     private void drawUpdateMessage() {
         Updater updater = main.getUpdater();
-        String message = updater.getMessageToRender();
 
-        if (updater.hasUpdate() && message != null && !updateMessageDisplayed) {
-            String[] textList = main.getUtils().wrapSplitText(message, 36);
+        if (updater.hasUpdate() && !updateMessageDisplayed) {
+            String message = updater.getMessageToRender();
 
-            int halfWidth = new ScaledResolution(MC).getScaledWidth() / 2;
-            Gui.drawRect(
-                    halfWidth - 110,
-                    20,
-                    halfWidth + 110,
-                    53 + textList.length * 10,
-                    ColorUtils.getDefaultBlue(140)
-            );
-            String title = SkyblockAddons.MOD_NAME;
-            GlStateManager.pushMatrix();
-            float scale = 1.5F;
-            GlStateManager.scale(scale, scale, 1);
-            DrawUtils.drawCenteredText(title, (int) (halfWidth / scale), (int) (30 / scale), ColorCode.WHITE.getColor());
-            GlStateManager.popMatrix();
-            int y = 45;
-            for (String line : textList) {
-                DrawUtils.drawCenteredText(line, halfWidth, y, ColorCode.WHITE.getColor());
-                y += 10;
+            if (message != null && Feature.AUTO_UPDATE.getValue() == AutoUpdateMode.UPDATE_OFF) {
+                String[] textList = main.getUtils().wrapSplitText(message, 36);
+
+                int halfWidth = new ScaledResolution(MC).getScaledWidth() / 2;
+                Gui.drawRect(
+                        halfWidth - 110,
+                        20,
+                        halfWidth + 110,
+                        53 + textList.length * 10,
+                        ColorUtils.getDefaultBlue(140)
+                );
+                String title = SkyblockAddons.MOD_NAME;
+                GlStateManager.pushMatrix();
+                float scale = 1.5F;
+                GlStateManager.scale(scale, scale, 1);
+                DrawUtils.drawCenteredText(title, (int) (halfWidth / scale), (int) (30 / scale), ColorCode.WHITE.getColor());
+                GlStateManager.popMatrix();
+                int y = 45;
+                for (String line : textList) {
+                    DrawUtils.drawCenteredText(line, halfWidth, y, ColorCode.WHITE.getColor());
+                    y += 10;
+                }
             }
-
-            main.getScheduler().scheduleTask(
-                    scheduledTask -> main.getRenderListener().setUpdateMessageDisplayed(true),
-                    10 * 20
-            );
 
             if (!main.getUpdater().hasSentUpdateMessage()) {
                 main.getUpdater().sendUpdateMessage();
+            }
+
+            if (updateMessageDisplayTask == null) {
+                updateMessageDisplayTask = main.getScheduler().scheduleTask(scheduledTask -> {
+                    main.getRenderListener().setUpdateMessageDisplayed(true);
+                    updateMessageDisplayTask = null;
+                }, 10 * 20);
             }
         }
     }
@@ -723,8 +733,8 @@ public class RenderListener {
      * This renders a bar for the skeleton hat bones bar.
      */
     public void drawSkeletonBar(float scale, ButtonLocation buttonLocation) {
-        float x = main.getConfigValuesManager().getActualX(Feature.SKELETON_BAR);
-        float y = main.getConfigValuesManager().getActualY(Feature.SKELETON_BAR);
+        float x = Feature.SKELETON_BAR.getActualX();
+        float y = Feature.SKELETON_BAR.getActualY();
         int bones = 0;
         if (!(MC.currentScreen instanceof LocationEditGui)) {
             for (Entity listEntity : MC.theWorld.loadedEntityList) {
@@ -765,8 +775,8 @@ public class RenderListener {
      */
     public void drawScorpionFoilTicker(float scale, ButtonLocation buttonLocation) {
         if (buttonLocation != null || main.getPlayerListener().getTickers() != -1) {
-            float x = main.getConfigValuesManager().getActualX(Feature.TICKER_CHARGES_DISPLAY);
-            float y = main.getConfigValuesManager().getActualY(Feature.TICKER_CHARGES_DISPLAY);
+            float x = Feature.TICKER_CHARGES_DISPLAY.getActualX();
+            float y = Feature.TICKER_CHARGES_DISPLAY.getActualY();
 
             int height = 9;
             int width = 3 * 11 + 9;
@@ -812,8 +822,8 @@ public class RenderListener {
         // The height and width of this element (box not included)
         int height = 9;
         int width = 9;
-        float x = main.getConfigValuesManager().getActualX(Feature.DEFENCE_ICON);
-        float y = main.getConfigValuesManager().getActualY(Feature.DEFENCE_ICON);
+        float x = Feature.DEFENCE_ICON.getActualX();
+        float y = Feature.DEFENCE_ICON.getActualY();
         x = transformX(x, width, scale, false);
         y = transformY(y, height, scale);
 
@@ -1250,8 +1260,8 @@ public class RenderListener {
                 return;
         }
 
-        float x = main.getConfigValuesManager().getActualX(feature);
-        float y = main.getConfigValuesManager().getActualY(feature);
+        float x = feature.getActualX();
+        float y = feature.getActualY();
 
         int height = 7;
         int width = MC.fontRendererObj.getStringWidth(text);
@@ -1831,8 +1841,8 @@ public class RenderListener {
             );
         }
 
-        float x = main.getConfigValuesManager().getActualX(Feature.BAIT_LIST);
-        float y = main.getConfigValuesManager().getActualY(Feature.BAIT_LIST);
+        float x = Feature.BAIT_LIST.getActualX();
+        float y = Feature.BAIT_LIST.getActualY();
 
         int spacing = 1;
         int iconSize = 16;
@@ -1947,8 +1957,8 @@ public class RenderListener {
                 return;
         }
 
-        float x = main.getConfigValuesManager().getActualX(feature);
-        float y = main.getConfigValuesManager().getActualY(feature);
+        float x = feature.getActualX();
+        float y = feature.getActualY();
         int color = feature.getColor();
 
         if (textMode) {
@@ -2304,8 +2314,8 @@ public class RenderListener {
             height = 100;
         }
 
-        float x = main.getConfigValuesManager().getActualX(Feature.DRAGON_STATS_TRACKER);
-        float y = main.getConfigValuesManager().getActualY(Feature.DRAGON_STATS_TRACKER);
+        float x = Feature.DRAGON_STATS_TRACKER.getActualX();
+        float y = Feature.DRAGON_STATS_TRACKER.getActualY();
         x = transformX(x, width, scale, feature.isEnabled(FeatureSetting.X_ALLIGNMENT));
         y = transformY(y, height, scale);
 
@@ -2377,8 +2387,8 @@ public class RenderListener {
 
     public void drawSlayerArmorProgress(float scale, ButtonLocation buttonLocation) {
         Feature feature = Feature.SLAYER_ARMOR_PROGRESS;
-        float x = main.getConfigValuesManager().getActualX(Feature.SLAYER_ARMOR_PROGRESS);
-        float y = main.getConfigValuesManager().getActualY(Feature.SLAYER_ARMOR_PROGRESS);
+        float x = Feature.SLAYER_ARMOR_PROGRESS.getActualX();
+        float y = Feature.SLAYER_ARMOR_PROGRESS.getActualY();
 
         int longest = -1;
         SlayerArmorProgress[] progresses = main.getInventoryUtils().getSlayerArmorProgresses();
@@ -2455,8 +2465,8 @@ public class RenderListener {
 
         String text = pet.getDisplayName();
 
-        float x = main.getConfigValuesManager().getActualX(Feature.PET_DISPLAY);
-        float y = main.getConfigValuesManager().getActualY(Feature.PET_DISPLAY);
+        float x = Feature.PET_DISPLAY.getActualX();
+        float y = Feature.PET_DISPLAY.getActualY();
 
         int height = 7 + MC.fontRendererObj.FONT_HEIGHT;
         int width = MC.fontRendererObj.getStringWidth(text) + 18; // + ItemStack width
@@ -2564,8 +2574,8 @@ public class RenderListener {
     @SuppressWarnings("IntegerDivisionInFloatingPointContext")
     public void drawItemPickupLog(float scale, ButtonLocation buttonLocation) {
         Feature feature = Feature.ITEM_PICKUP_LOG;
-        float x = main.getConfigValuesManager().getActualX(feature);
-        float y = main.getConfigValuesManager().getActualY(feature);
+        float x = feature.getActualX();
+        float y = feature.getActualY();
 
         boolean downwards = feature.getAnchorPoint().isOnTop();
         boolean renderItemStack = feature.isEnabled(FeatureSetting.RENDER_ITEM_ON_LOG);
@@ -2658,9 +2668,9 @@ public class RenderListener {
      * ----
      */
     private void drawCompactDeployableStatus(float scale, ButtonLocation buttonLocation, Deployable deployable, int seconds) {
-        float x = main.getConfigValuesManager().getActualX(Feature.DEPLOYABLE_STATUS_DISPLAY);
-        float y = main.getConfigValuesManager().getActualY(Feature.DEPLOYABLE_STATUS_DISPLAY);
         Feature feature = Feature.DEPLOYABLE_STATUS_DISPLAY;
+        float x = feature.getActualX();
+        float y = feature.getActualY();
 
         String secondsString = String.format("§e%ss", seconds);
         int spacing = 1;
@@ -2714,9 +2724,9 @@ public class RenderListener {
      * XXs
      */
     private void drawDetailedDeployableStatus(float scale, ButtonLocation buttonLocation, Deployable deployable, int seconds) {
-        float x = main.getConfigValuesManager().getActualX(Feature.DEPLOYABLE_STATUS_DISPLAY);
-        float y = main.getConfigValuesManager().getActualY(Feature.DEPLOYABLE_STATUS_DISPLAY);
         Feature feature = Feature.DEPLOYABLE_STATUS_DISPLAY;
+        float x = feature.getActualX();
+        float y = feature.getActualY();
 
         List<String> display = new LinkedList<>();
         // Counts already long strings
@@ -2740,31 +2750,26 @@ public class RenderListener {
             passIndex++;
         }
 
-        if (deployable.getStrength() > 0) {
-            display.add(String.format("§c+%d ❁ ", deployable.getStrength()));
-        }
+        int strength = deployable.getStrength();
+        if (strength > 0) display.add("§c+" + strength + " ❁ ");
 
-        if (deployable.getVitality() > 0.0) {
-            double vit = deployable.getVitality();
-            display.add(String.format("§4+%s ♨ ", vit % 1 == 0.0 ? Integer.toString((int) vit) : vit));
-        }
+        double vitality = deployable.getVitality();
+        if (vitality > 0.0) display.add("§4+" + TextUtils.formatNumber(vitality) + " ♨ ");
 
-        if (deployable.getMending() > 0.0) {
-            double mending = deployable.getMending();
-            display.add(String.format("§a+%s ☄ ", mending % 1 == 0.0 ? Integer.toString((int) mending) : mending));
-        }
+        double mending = deployable.getMending();
+        if (mending > 0.0) display.add("§a+" + TextUtils.formatNumber(mending) + " ☄ ");
 
-        if (deployable.getTrueDefense() > 0) {
-            display.add(String.format("§f+%s ❂ ", deployable.getTrueDefense()));
-        }
+        int trueDefense = deployable.getTrueDefense();
+        if (trueDefense > 0) display.add("§f+" + trueDefense + " ❂ ");
 
-        if (deployable.getFerocity() > 0) {
-            display.add(String.format("§c+%s ⫽ ", deployable.getFerocity()));
-        }
+        int ferocity = deployable.getFerocity();
+        if (ferocity > 0) display.add("§c+" + ferocity + " ⫽ ");
 
-        if (deployable.getBonusAttackSpeed() > 0) {
-            display.add(String.format("§e+%s%% ⚔ ", deployable.getBonusAttackSpeed()));
-        }
+        int bonusAttackSpeed = deployable.getBonusAttackSpeed();
+        if (bonusAttackSpeed > 0) display.add("§e+" + bonusAttackSpeed + "% ⚔ ");
+
+        int trophyFishChance = deployable.getTrophyFishChance();
+        if (trophyFishChance > 0) display.add("§6+" + trophyFishChance + " ♔ ");
 
         // For better visual (maybe?)
         if (feature.isEnabled(FeatureSetting.EXPAND_DEPLOYABLE_STATUS) && display.size() > 3) {
@@ -2803,10 +2808,17 @@ public class RenderListener {
         x = transformX(x, width, scale, feature.isEnabled(FeatureSetting.X_ALLIGNMENT));
         y = transformY(y, height, scale);
 
-        float startY = Math.round(y + (iconAndSecondsHeight / 2f) - (effectsHeight / 2f));
+        float startY = Math.round(y + (iconAndSecondsHeight / 2F) - (effectsHeight / 2F));
         if (buttonLocation != null) {
-            buttonLocation.checkHoveredAndDrawBox(x, x + width, startY - spacingBetweenLines, startY + height, scale);
+            buttonLocation.checkHoveredAndDrawBox(x, x + width, y, y + height, scale);
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        }
+
+        // move the overflowing part to the buttonLocation box
+        if (effectsHeight > iconAndSecondsHeight) {
+            int add = Math.abs(effectsHeight - iconAndSecondsHeight) / 2;
+            y += add;
+            startY += add;
         }
 
         Entity entity = null;

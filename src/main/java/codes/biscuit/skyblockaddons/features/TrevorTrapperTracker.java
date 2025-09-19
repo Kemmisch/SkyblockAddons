@@ -24,7 +24,6 @@ import net.minecraft.potion.Potion;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
-import net.minecraftforge.client.event.RenderLivingEvent;
 import net.minecraftforge.client.event.RenderLivingEvent.Specials.Pre;
 import net.minecraftforge.event.entity.living.LivingEvent.LivingUpdateEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -66,8 +65,8 @@ public class TrevorTrapperTracker {
         Feature feature = Feature.TREVOR_THE_TRAPPER_FEATURES;
         if ((feature.isEnabled(FeatureSetting.TREVOR_TRACKED_ENTITY_PROXIMITY_INDICATOR)
                 && main.getUtils().isTrackingAnimal()) || buttonLocation != null) {
-            float x = main.getConfigValuesManager().getActualX(feature);
-            float y = main.getConfigValuesManager().getActualY(feature);
+            float x = feature.getActualX();
+            float y = feature.getActualY();
 
             int height = 9;
             int width = 3 * 11 + 9;
@@ -234,7 +233,7 @@ public class TrevorTrapperTracker {
     }
 
     @SubscribeEvent
-    public void onRenderNameTag(RenderLivingEvent.Specials.Pre<EntityLivingBase> e) {
+    public void onRenderNameTag(Pre<EntityLivingBase> e) {
         if (Feature.TREVOR_THE_TRAPPER_FEATURES.isDisabled(FeatureSetting.TREVOR_BETTER_NAMETAG) || !isTrackerConditionsMet()) {
             return;
         }

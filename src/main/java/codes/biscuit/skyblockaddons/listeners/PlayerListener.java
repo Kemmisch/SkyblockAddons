@@ -40,6 +40,7 @@ import codes.biscuit.skyblockaddons.utils.LocationUtils;
 import codes.biscuit.skyblockaddons.utils.RomanNumeralParser;
 import codes.biscuit.skyblockaddons.utils.ScoreboardManager;
 import codes.biscuit.skyblockaddons.utils.TextUtils;
+import codes.biscuit.skyblockaddons.utils.Utils;
 import codes.biscuit.skyblockaddons.utils.data.DataUtils;
 import codes.biscuit.skyblockaddons.utils.data.requests.MayorRequest;
 import com.google.common.collect.Sets;
@@ -132,7 +133,7 @@ public class PlayerListener {
     private static final Pattern PROFILE_TYPE_SYMBOL = Pattern.compile("(?i)§[0-9A-FK-ORZ][♲Ⓑ]");
     private static final Pattern NETHER_FACTION_SYMBOL = Pattern.compile("(?i)§[0-9A-FK-ORZ][⚒ቾ]");
     private static final Pattern AUTOPET_PATTERN = Pattern.compile("§cAutopet §eequipped your §7\\[Lvl (?<level>\\d+)](?: §8\\[§6\\d+§8§.✦§8])? §(?<rarityColor>.)(?<name>.*)§e! §a§lVIEW RULE§r");
-    private static final Pattern PET_LEVELED_UP_PATTERN = Pattern.compile("§r§aYour §r§(?<rarityColor>.)(?<name>.*?)(?:§r§. ✦)? §r§aleveled up to level §r(?:§.)*(?<newLevel>\\d+)§r§a!§r");
+    private static final Pattern PET_LEVELED_UP_PATTERN = Pattern.compile("§r§aYour §r§(?<rarityColor>.)(?<name>.*?)(?<cosmetic>§r§. ✦)? §r§aleveled up to level §r(?:§.)*(?<newLevel>\\d+)§r§a!§r");
     private static final Pattern PET_ITEM_PATTERN = Pattern.compile("§r§aYour pet is now holding §r§(?<rarityColor>.)(?<petItem>.*)§r§a.§r");
 
     private static final Set<String> SOUP_RANDOM_MESSAGES = new HashSet<>(Arrays.asList("I feel like I can fly!", "What was in that soup?",
@@ -286,8 +287,13 @@ public class PlayerListener {
                 );
 
             } else if ((matcher = PET_LEVELED_UP_PATTERN.matcher(formattedText)).matches()) {
+                String petName = matcher.group("name");
+                String petCosmetic = matcher.group("cosmetic");
+                if (!StringUtils.isNullOrEmpty(petCosmetic)) {
+                    petName += petCosmetic.replace("§r", "");
+                }
                 PetManager.getInstance().updateAndSetCurrentLevelledPet(
-                        matcher.group("newLevel"), matcher.group("rarityColor"), matcher.group("name")
+                        matcher.group("newLevel"), matcher.group("rarityColor"), petName
                 );
 
             } else if ((matcher = PET_ITEM_PATTERN.matcher(formattedText)).matches()) {
@@ -328,7 +334,7 @@ public class PlayerListener {
                 main.getPersistentValuesManager().addEyeResetKills();
                 // TODO: Seems like leg warning and num sc killed should be separate features
             } else if (SeaCreatureManager.getInstance().getAllSeaCreatureSpawnMessages().contains(unformattedText)) {
-                int spawned = unformattedText.contains("Magma Slug") ? 4 : 1;
+                int spawned = unformattedText.contains("Magma Slug") || unformattedText.contains("Bayou Sludge") ? 4 : 1;
                 if (doubleHook) {
                     spawned *= 2;
                     doubleHook = false;
@@ -1026,12 +1032,12 @@ public class PlayerListener {
 
         if (Feature.SHOW_SKYBLOCK_ITEM_ID.isEnabled() || Feature.DEVELOPER_MODE.isEnabled()) {
             String itemId = ItemUtils.getSkyblockItemID(e.itemStack);
-            String tooltipLine = EnumChatFormatting.DARK_GRAY + "skyblock:" + itemId;
+            String tooltipLine = ColorCode.DARK_GRAY + "skyblock:" + itemId;
 
             if (itemId != null) {
                 if (MC.gameSettings.advancedItemTooltips) {
                     for (int i = e.toolTip.size(); i-- > 0; ) {
-                        if (e.toolTip.get(i).startsWith(EnumChatFormatting.DARK_GRAY + "minecraft:")) {
+                        if (e.toolTip.get(i).startsWith(ColorCode.DARK_GRAY + "minecraft:")) {
                             e.toolTip.add(i + 1, tooltipLine);
                             break;
                         }
@@ -1201,7 +1207,7 @@ public class PlayerListener {
             }
 
             if (DevUtils.isLoggingSkyBlockOre()) {
-                main.getUtils().sendMessage("§eMined ore: §f" + minedOre.name());
+                Utils.sendMessage("§eMined ore: §f" + minedOre.name());
             }
         }
         if (Feature.SHOW_ITEM_COOLDOWNS.isEnabled()) {

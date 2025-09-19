@@ -3,6 +3,7 @@ package codes.biscuit.skyblockaddons.gui.screens;
 import codes.biscuit.skyblockaddons.SkyblockAddons;
 import codes.biscuit.skyblockaddons.core.feature.Feature;
 import codes.biscuit.skyblockaddons.core.SkyblockDate;
+import codes.biscuit.skyblockaddons.core.feature.FeatureSetting;
 import codes.biscuit.skyblockaddons.gui.buttons.ButtonCustomToggle;
 import codes.biscuit.skyblockaddons.gui.buttons.IslandButton;
 import codes.biscuit.skyblockaddons.gui.buttons.IslandMarkerButton;
@@ -67,10 +68,15 @@ public class IslandWarpGui extends SkyblockAddonsScreen {
 
         this.buttonList.add(new ButtonCustomToggle(x, y - 30 - 60 * 2, 50,
                 Feature.FANCY_WARP_MENU::isEnabled,
-                () -> Feature.FANCY_WARP_MENU.setEnabled(Feature.FANCY_WARP_MENU.isDisabled())));
+                () -> Feature.FANCY_WARP_MENU.setEnabled(Feature.FANCY_WARP_MENU.isDisabled())
+        ));
         this.buttonList.add(new ButtonCustomToggle(x, y - 30 - 60, 50,
-                Feature.DOUBLE_WARP::isEnabled,
-                () -> Feature.DOUBLE_WARP.setEnabled(Feature.DOUBLE_WARP.isDisabled())));
+                () -> Feature.FANCY_WARP_MENU.isEnabled(FeatureSetting.DOUBLE_WARP),
+                () -> Feature.FANCY_WARP_MENU.set(
+                        FeatureSetting.DOUBLE_WARP,
+                        Feature.FANCY_WARP_MENU.isDisabled(FeatureSetting.DOUBLE_WARP)
+                )
+        ));
     }
 
     @Override
@@ -130,7 +136,7 @@ public class IslandWarpGui extends SkyblockAddonsScreen {
                 x / textScale + 50, (y - 30 - 60 * 2) / textScale + 5, 0xFFFFFFFF
         );
         mc.fontRendererObj.drawStringWithShadow(
-                Feature.DOUBLE_WARP.getMessage(),
+                FeatureSetting.DOUBLE_WARP.getMessage(),
                 x / textScale + 50, (y - 30 - 60) / textScale + 5, 0xFFFFFFFF
         );
         GlStateManager.popMatrix();
@@ -147,7 +153,7 @@ public class IslandWarpGui extends SkyblockAddonsScreen {
         if (mouseButton == 0 && selectedMarker != null) {
             mc.displayGuiScreen(null);
 
-            if (Feature.DOUBLE_WARP.isEnabled()) {
+            if (Feature.FANCY_WARP_MENU.isEnabled(FeatureSetting.DOUBLE_WARP)) {
                 doubleWarpMarker = selectedMarker;
 
                 // Remove the marker if it didn't trigger for some reason...
@@ -232,9 +238,12 @@ public class IslandWarpGui extends SkyblockAddonsScreen {
         THE_BARN("The Barn", 1125, 850),
         HUB("Hub", 300, 820),
         PRIVATE_ISLAND("Private Island", 275, 1172),
-        GARDEN("Garden", 50, 1050),
+        THE_GARDEN("The Garden", 50, 1050),
         DUNGEON_HUB("Dungeon Hub", 1500, 1100),
-        JERRYS_WORKSHOP("Jerry's Workshop", 1280, 1150);
+        JERRYS_WORKSHOP("Jerry's Workshop", 1280, 1150),
+        THE_RIFT("The Rift", 1720, 1050),
+        BACKWATER_BAYOU("Backwater Bayou", 960, 1275),
+        GALATEA("Galatea", -250, 220);
 
         private final String label;
         private final int x;
@@ -284,75 +293,78 @@ public class IslandWarpGui extends SkyblockAddonsScreen {
     //TODO: Maybe change these to load from a file at some point
     @Getter
     public enum Marker {
-        PRIVATE_ISLAND("home", getMessage("warpMenu.home"), Island.PRIVATE_ISLAND, true, 72, 90),
+        PRIVATE_ISLAND("home", getMessage("warpMenu.home"), Island.PRIVATE_ISLAND, 72, 90),
 
-        GARDEN("garden", getMessage("warpMenu.spawn"), Island.GARDEN, true, 160, 70),
+        THE_GARDEN("garden", getMessage("warpMenu.spawn"), Island.THE_GARDEN, 160, 70),
 
         JERRYS_WORKSHOP("workshop", getMessage("warpMenu.spawn"), Island.JERRYS_WORKSHOP, 35, 90),
 
-        HUB("hub", getMessage("warpMenu.spawn"), Island.HUB, true, 610, 210),
+        THE_RIFT("rift", getMessage("warpMenu.spawn"), Island.THE_RIFT, 35, 90),
+
+        BACKWATER_BAYOU("backwater", getMessage("warpMenu.spawn"), Island.BACKWATER_BAYOU, 60, 150),
+
+        HUB("hub", getMessage("warpMenu.spawn"), Island.HUB, 610, 210),
         ELIZABETH("elizabeth", "Elizabeth", Island.HUB, 660, 150),
         CASTLE("castle", "Castle", Island.HUB, 130, 80),
         DARK_AUCTION("da", "Sirius Shack", Island.HUB, 385, 415),
         CRYPT("crypt", "Crypts", Island.HUB, 580, 100),
         WIZARD_TOWER("wizard", "Wizard Tower", Island.HUB, 490, 260),
-        MUSEUM("museum", "Museum", Island.HUB, true, 310, 200),
-        TRADE_CENTER("stonks", "Trade Center", Island.HUB, false, 530, 175),
-        CARNIVAL("carnival", "Carnival", Island.HUB, false, 480, 100),
+        MUSEUM("museum", "Museum", Island.HUB, 310, 200),
+        TRADE_CENTER("stonks", "Trade Center", Island.HUB, 530, 175),
+        CARNIVAL("carnival", "Carnival", Island.HUB, 480, 100),
 
-        SPIDERS_DEN("spider", getMessage("warpMenu.spawn"), Island.SPIDERS_DEN, true, 345, 240),
+        SPIDERS_DEN("spider", getMessage("warpMenu.spawn"), Island.SPIDERS_DEN, 345, 240),
         SPIDERS_DEN_NEST("nest", "Top of Nest", Island.SPIDERS_DEN, 450, 30),
         ARACHNES_SANCTUARY("arachne", "Arachne's Sanctuary", Island.SPIDERS_DEN, 240, 135),
 
-        THE_PARK("park", getMessage("warpMenu.spawn"), Island.THE_PARK, true, 263, 308),
+        THE_PARK("park", getMessage("warpMenu.spawn"), Island.THE_PARK, 263, 308),
         HOWLING_CAVE("howl", "Howling Cave", Island.THE_PARK, 254, 202),
         THE_PARK_JUNGLE("jungle", "Jungle", Island.THE_PARK, 194, 82),
 
-        THE_END("end", getMessage("warpMenu.spawn"), Island.THE_END, true, 440, 291),
+        // https://hypixel-skyblock.fandom.com/wiki/Galatea?file=Galatea.png
+        GALATEA("galatea", getMessage("warpMenu.spawn"), Island.GALATEA, 160, 260),
+        MURKWATER_LOCH("murkwater", "Murkwater Loch", Island.GALATEA, 220, 140),
+
+        THE_END("end", getMessage("warpMenu.spawn"), Island.THE_END, 440, 291),
         DRAGONS_NEST("drag", "Dragon's Nest", Island.THE_END, 260, 248),
-        VOID_SEPULTURE("void", "Void Sepulture", Island.THE_END, true, 370, 227),
+        VOID_SEPULTURE("void", "Void Sepulture", Island.THE_END, 370, 227),
 
-        CRIMSON_ISLE("nether", getMessage("warpMenu.spawn"), Island.CRIMSON_ISLE, true, 70, 280),
-        FORGOTTEN_SKULL("kuudra", "Forgotten Skull", Island.CRIMSON_ISLE, true, 460, 90),
-        THE_WASTELAND("wasteland", "The Wasteland", Island.CRIMSON_ISLE, true, 330, 160),
-        DRAGONTAIL("dragontail", "Dragontail", Island.CRIMSON_ISLE, true, 140, 150),
-        SCARLETON("scarleton", "Scarleton", Island.CRIMSON_ISLE, true, 400, 220),
-        SMOLDERING_TOMB("smold", "Smoldering Tomb", Island.CRIMSON_ISLE, true, 350, 70),
+        CRIMSON_ISLE("nether", getMessage("warpMenu.spawn"), Island.CRIMSON_ISLE, 70, 280),
+        FORGOTTEN_SKULL("kuudra", "Forgotten Skull", Island.CRIMSON_ISLE, 460, 90),
+        THE_WASTELAND("wasteland", "The Wasteland", Island.CRIMSON_ISLE, 330, 160),
+        DRAGONTAIL("dragontail", "Dragontail", Island.CRIMSON_ISLE, 140, 150),
+        SCARLETON("scarleton", "Scarleton", Island.CRIMSON_ISLE, 400, 220),
+        SMOLDERING_TOMB("smold", "Smoldering Tomb", Island.CRIMSON_ISLE, 350, 70),
 
-        THE_BARN("barn", getMessage("warpMenu.spawn"), Island.THE_BARN, true, 140, 150),
-        MUSHROOM_DESERT("desert", getMessage("warpMenu.spawn"), Island.MUSHROOM_DESERT, true, 210, 295),
-        TRAPPER("trapper", "Trapper's Hut", Island.MUSHROOM_DESERT, true, 300, 200),
+        THE_BARN("barn", getMessage("warpMenu.spawn"), Island.THE_BARN, 140, 150),
+        MUSHROOM_DESERT("desert", getMessage("warpMenu.spawn"), Island.MUSHROOM_DESERT, 210, 295),
+        TRAPPER("trapper", "Trapper's Hut", Island.MUSHROOM_DESERT, 300, 200),
 
-        GOLD_MINE("gold", getMessage("warpMenu.spawn"), Island.GOLD_MINE, true, 86, 259),
+        GOLD_MINE("gold", getMessage("warpMenu.spawn"), Island.GOLD_MINE, 86, 259),
 
-        DEEP_CAVERNS("deep", getMessage("warpMenu.spawn"), Island.DEEP_CAVERNS, true, 97, 213),
-        DWARVEN_MINES("mines", "Dwarven Mines", Island.DEEP_CAVERNS, false, 280, 205),
-        DWARVEN_FORGE("forge", "Forge", Island.DEEP_CAVERNS, true, 280, 280),
-        DWARVEN_BASE_CAMP("base", "Dwarven Base Camp", Island.DEEP_CAVERNS, true, 240, 330),
-        CRYSTAL_HOLLOWS("crystals", "Crystal Hollows", Island.DEEP_CAVERNS, true, 190, 360),
-        CRYSTAL_NUCLEUS("nucleus", "Crystal Nucleus", Island.DEEP_CAVERNS, true, 140, 390),
+        DEEP_CAVERNS("deep", getMessage("warpMenu.spawn"), Island.DEEP_CAVERNS, 97, 213),
+        DWARVEN_MINES("mines", "Dwarven Mines", Island.DEEP_CAVERNS, 280, 205),
+        DWARVEN_FORGE("forge", "Forge", Island.DEEP_CAVERNS, 280, 280),
+        DWARVEN_BASE_CAMP("base", "Dwarven Base Camp", Island.DEEP_CAVERNS, 240, 330),
+        CRYSTAL_HOLLOWS("crystals", "Crystal Hollows", Island.DEEP_CAVERNS, 190, 360),
+        CRYSTAL_NUCLEUS("nucleus", "Crystal Nucleus", Island.DEEP_CAVERNS, 140, 390),
 
-        DUNGEON_HUB_ISLAND("dungeon_hub", getMessage("warpMenu.spawn"), Island.DUNGEON_HUB, false, 35, 80),
+        DUNGEON_HUB_ISLAND("dungeon_hub", getMessage("warpMenu.spawn"), Island.DUNGEON_HUB, 35, 80),
         ;
 
         private final String warpName;
         private final String label;
         private final Island island;
-        private final boolean advanced;
         private final int x;
         private final int y;
 
         Marker(String warpName, String label, Island island, int x, int y) {
-            this(warpName, label, island, false, x, y);
-        }
-
-        Marker(String warpName, String label, Island island, boolean advanced, int x, int y) {
             this.warpName = warpName;
             this.label = label;
             this.island = island;
             this.x = x;
             this.y = y;
-            this.advanced = advanced;
         }
     }
+
 }

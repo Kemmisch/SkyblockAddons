@@ -2,13 +2,13 @@
   "bannerImageURL": null,
   "bannerLink": null,
   "updateInfo": {
-    "latestRelease": "1.10.6",
-    "releaseDownload": "https://modrinth.com/mod/skyblockaddons-unofficial/versions",
-    "releaseChangelog": "https://modrinth.com/mod/skyblockaddons-unofficial/changelog",
-    "releaseNote": "Please read the changelog for 1.10.x changes.",
+    "latestRelease": "1.10.10",
+    "releaseDownload": "https://modrinth.com/project/F35D4vTL/versions",
+    "releaseChangelog": "https://modrinth.com/project/F35D4vTL/changelog",
+    "releaseNote": "",
     "latestBeta": "1.10.0-beta.4",
-    "betaDownload": "https://modrinth.com/mod/skyblockaddons-unofficial/versions",
-    "betaChangelog": "https://modrinth.com/mod/skyblockaddons-unofficial/changelog",
+    "betaDownload": "https://modrinth.com/project/F35D4vTL/versions",
+    "betaChangelog": "https://modrinth.com/project/F35D4vTL/changelog",
     "betaNote": ""
   },
   "languageJSONFormat": "https://raw.githubusercontent.com/Fix3dll/SkyblockAddons/main/src/main/resources/lang/%s.json",
@@ -112,5 +112,7 @@
   },
   "hypixelBrands": [
     ".*Hypixel BungeeCord.*"
-  ]
+  ],
+  "autoUpdateStable": null,
+  "autoUpdateLatest": null
 }
